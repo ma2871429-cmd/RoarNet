@@ -14,12 +14,12 @@ import android.view.Gravity;
 
 public class MainActivity extends Activity {
     // After deploying backend/server, replace this with its HTTPS address, e.g. https://roarnet.example.com
-    private static final String SERVER_URL = "";
+    private static final String SERVER_URL = "http://127.0.0.1:3180";
     private WebView web;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (SERVER_URL.startsWith("https://")) {
+        if (SERVER_URL.startsWith("https://") || SERVER_URL.startsWith("http://")) {
             web = new WebView(this);
             WebSettings settings = web.getSettings();
             settings.setJavaScriptEnabled(true);
