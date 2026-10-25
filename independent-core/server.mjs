@@ -13,7 +13,7 @@ for (const line of fs.readFileSync(path.join(root, '.env'), 'utf8').split(/\r?\n
 }
 
 const ADMIN = process.env.ADMIN_TOKEN || '';
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const PORT = Number(process.env.PORT || 3180);
 const RELAY_TOKEN = process.env.RELAY_TOKEN || '';
 const MONTHLY_CAP_BYTES = 150_000_000_000;

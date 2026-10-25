@@ -1,0 +1,6 @@
+build:
+  system: auto
+  command: npm install
+
+working_directory: independent-core
+start_command: npm start
