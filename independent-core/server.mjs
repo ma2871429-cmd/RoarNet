@@ -7,7 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 
-for (const line of fs.readFileSync(path.join(root, '.env'), 'utf8').split(/\r?\n/)) {
+for (const line of (fs.existsSync(path.join(root, '.env')) ? fs.readFileSync(path.join(root, '.env'), 'utf8').split(/\r?\n/) : [])) {
   const m = line.match(/^\s*([A-Z_]+)=(.*)$/);
   if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2];
 }
