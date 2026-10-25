@@ -314,7 +314,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
   <label>السعر بالدولار</label><input id="pkgPrice" type="number" min="0" step="0.01" value="3">
   <button type="button" id="fillDefaults">تعبئة البيانات الافتراضية</button>
   <button id="createPackage">إنشاء باقة</button>
-  <button id="loadPackages">تحديث الباقات</button>
+  <button id="loadAdminPackages">تحديث الباقات</button>
   <p id="packageStatus"></p>
 </div>
 <div id="packageManager" class="grid"></div>
@@ -345,6 +345,49 @@ async function api(path,{token='',method='GET',data}={}){
   if(!response.ok) throw new Error(result.error||('HTTP '+response.status));
   return result;
 }
+
+// ROARNET_SAFE_AUTOFILL_V1
+// Defaults are convenience values only; secrets and balances are never fabricated.
+function applyRoarNetDefaults(){
+  const defaults = {
+    nodeLabel: 'RoarNet Home Node',
+    customerLabel: 'RoarNet Customer',
+    pkgName: 'RoarNet Starter 5GB',
+    pkgGb: '5',
+    pkgPrice: '3'
+  };
+
+  for (const [id, value] of Object.entries(defaults)) {
+    const field = $(id);
+    if (field && !field.value.trim()) field.value = value;
+  }
+
+  const customerToken = $('customerToken');
+  const shareAdminToken = $('shareAdminToken');
+  const adminTokenField = $('adminToken');
+
+  if (customerToken) customerToken.setAttribute('autocomplete', 'off');
+  if (shareAdminToken) shareAdminToken.setAttribute('autocomplete', 'off');
+  if (adminTokenField) adminTokenField.setAttribute('autocomplete', 'off');
+}
+
+applyRoarNetDefaults();
+
+document.querySelectorAll('input[type="number"]').forEach(field => {
+  field.addEventListener('input', () => {
+    if (field.value === '') return;
+    const value = Number(field.value);
+    if (!Number.isFinite(value)) field.setCustomValidity('أدخل رقماً صالحاً.');
+    else if (field.min !== '' && value < Number(field.min))
+      field.setCustomValidity('القيمة أقل من الحد المسموح.');
+    else if (field.max !== '' && value > Number(field.max))
+      field.setCustomValidity('القيمة أعلى من الحد المسموح.');
+    else field.setCustomValidity('');
+  });
+});
+
+// END ROARNET_SAFE_AUTOFILL_V1
+
 document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));
   document.querySelectorAll('section.panel').forEach(p=>p.classList.toggle('active',p.id===button.dataset.tab));
@@ -427,7 +470,7 @@ $('loadAdmin').onclick=async()=>{
   }catch(e){say('adminStatus','تعذّر تحميل الملخص: '+e.message)}
 };
 
-$('loadPackages').onclick=async()=>{
+$('loadAdminPackages').onclick=async()=>{
   try{
     const r=await api('/api/admin/packages',{token:adminToken()});
     const list=r.packages||[];
@@ -446,7 +489,7 @@ $('loadPackages').onclick=async()=>{
             data:{active:b.dataset.active!=='1'}
           });
           say('packageStatus','تم تحديث حالة الباقة.');
-          $('loadPackages').click();
+          $('loadAdminPackages').click();
         }catch(e){say('packageStatus','تعذّر تحديث الباقة: '+e.message)}
       };
     });
@@ -547,17 +590,13 @@ $('createPackage').onclick=async()=>{
       data:{name,bytes:Math.round(gb*1e9),priceUsd,active:true}
     });
     say('packageStatus','تم إرسال طلب إنشاء الباقة.');
-    $('loadPackages').click();
+    $('loadAdminPackages').click();
   }catch(e){say('packageStatus','تعذّر إنشاء الباقة: '+e.message)}
 };
 
 $('fillDefaults').onclick=()=>{
-  $('nodeLabel').value='RoarNet Home Node';
-  $('customerLabel').value='RoarNet Demo Customer';
-  $('pkgName').value='RoarNet Starter 5GB';
-  $('pkgGb').value='5';
-  $('pkgPrice').value='3';
-  alert('تمت تعبئة البيانات الافتراضية. راجعها قبل الحفظ.');
+  applyRoarNetDefaults();
+  say('packageStatus','تمت تعبئة القيم الافتراضية. راجعها قبل الحفظ.');
 };
 $('loadOrders').onclick=async()=>{
   try{const r=await api('/api/admin/orders',{token:adminToken()}),list=r.orders||[];
