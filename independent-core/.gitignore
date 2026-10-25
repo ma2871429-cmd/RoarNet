@@ -1,0 +1,19 @@
+
+.env
+
+# Runtime secrets and persistent data
+.env*
+!.env.example
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.pem
+*.key
+
+# Local backups and temporary patches
+*.bak
+*.backup*
+*.before-*
+*.before-*.bak
