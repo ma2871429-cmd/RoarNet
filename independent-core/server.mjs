@@ -655,6 +655,41 @@ $('createCustomer').onclick=async()=>{
       });
     }
 
+
+    // ROARNET_MY_CONTRIBUTIONS_V1
+    if (req.method === 'GET' && url.pathname === '/api/node/my-contributions') {
+      const node = nodeFor(req);
+      if (!node) return json(res, 401, { error: 'Invalid node token' });
+
+      const monthKey = now().slice(0, 7);
+      const total = db.prepare(`
+        SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS events
+        FROM usage_events WHERE node_id=?
+      `).get(node.id);
+      const monthly = db.prepare(`
+        SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS events
+        FROM usage_events WHERE node_id=? AND substr(created_at, 1, 7)=?
+      `).get(node.id, monthKey);
+      const recent = db.prepare(`
+        SELECT reference, bytes, created_at
+        FROM usage_events WHERE node_id=?
+        ORDER BY id DESC LIMIT 10
+      `).all(node.id);
+
+      return json(res, 200, {
+        nodeId: node.id,
+        month: monthKey,
+        total: { bytes: Number(total.bytes), events: Number(total.events) },
+        monthly: { bytes: Number(monthly.bytes), events: Number(monthly.events) },
+        recent: recent.map(e => ({
+          reference: e.reference,
+          bytes: Number(e.bytes),
+          createdAt: e.created_at
+        })),
+        note: 'These are reported usage events, not independently verified billable traffic or confirmed earnings.'
+      });
+    }
+
     // ROARNET_PARTICIPANT_CONSENT_V1
     if (url.pathname === '/api/node/consent' &&
         req.method === 'GET') {
