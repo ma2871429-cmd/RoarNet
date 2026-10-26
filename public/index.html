@@ -1,19 +1,66 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>RoarNet — لوحة الشراكة</title><style>
-*{box-sizing:border-box}body{margin:0;background:#101827;color:#edf4ff;font-family:system-ui,Arial,sans-serif}main{max-width:900px;margin:auto;padding:16px}header,.card{background:#1b273a;border:1px solid #34445b;border-radius:16px;padding:18px;margin-bottom:14px}h1{color:#75e0c1;margin:0}small,.muted{color:#afbdd0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.value{font-size:24px;font-weight:700;margin:8px 0}button,input{font:inherit;border-radius:9px;padding:11px;border:1px solid #42536b}input{width:100%;background:#101827;color:white;margin:6px 0 12px}button{cursor:pointer;font-weight:700;margin:4px 0;background:#34445b;color:white}.primary{background:#75e0c1;color:#10202a;border:0}.danger{background:#842d3a}.notice{border-right:3px solid #75e0c1;padding:10px;background:#152033;line-height:1.8}.hidden{display:none}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:right;padding:8px;border-bottom:1px solid #34445b;overflow-wrap:anywhere}.scroll{overflow:auto}.status{display:inline-block;padding:5px 9px;background:#34445b;border-radius:20px}.error{color:#ff9d9d}.success{color:#75e0c1}@media(max-width:480px){main{padding:9px}.card,header{padding:13px}}
-</style></head><body><main><header><h1>🦁 RoarNet</h1><p>لوحة إدارة الشراكة ومحاسبة الترافيك</p><span class="status" id="status">جاري الفحص…</span></header>
-<section id="login" class="card"><h2>دخول الإدارة</h2><p class="muted">بيانات الدخول تُحدَّد محلياً داخل ملف .env.</p><label>اسم المستخدم</label><input id="username" autocomplete="username" value="admin"><label>كلمة المرور</label><input id="password" type="password" autocomplete="current-password"><button class="primary" id="loginBtn">دخول</button><p id="loginMsg" aria-live="polite"></p></section>
-<section id="app" class="hidden"><div class="card"><div class="row"><h2>حالة المشروع</h2><button id="logoutBtn">تسجيل الخروج</button></div><p class="notice">النسخة تفصل الرصيد التجريبي عن أرباح المزوّد. الرصيد الحقيقي لا يُضاف إلا من مرجع موثّق. مشاركة الإنترنت والسحب الآلي يظلان معطّلين إلى أن تُقبل الشراكة وتُراجع واجهات المزوّد.</p></div>
-<div class="grid"><div class="card"><small>الأرباح المؤكدة من المزوّد</small><div class="value" id="confirmed">0.000000 USD</div></div><div class="card"><small>الرصيد التجريبي</small><div class="value" id="demo">0.000000 USD</div></div><div class="card"><small>طلبات السحب قيد المراجعة</small><div class="value" id="pending">0.000000 USD</div></div><div class="card"><small>المزوّد</small><div class="value" id="provider">غير مربوط</div><small id="providerNote"></small></div></div>
-<div class="card"><h2>إعدادات مزوّد الترافيك</h2><p class="notice">أدخل بيانات API الرسمية التي يمنحك إياها المزوّد بعد قبول الشراكة. المفاتيح تُحفظ مشفّرة على الخادم ولا تظهر بعد الحفظ. حفظ المفتاح لا يفعّل الترافيك تلقائياً.</p><label>اسم المزوّد</label><input id="providerNameInput" placeholder="PROXIES.SX"><label>عنوان API الرسمي (HTTPS)</label><input id="providerApiBaseInput" placeholder="https://api.example.com" inputmode="url"><label>معرّف الجهاز</label><input id="providerDeviceIdInput" placeholder="Device ID"><label>مفتاح API</label><input id="providerApiKeyInput" type="password" autocomplete="new-password" placeholder="المفتاح الرسمي"><label>رمز الجهاز / Token</label><input id="providerDeviceTokenInput" type="password" autocomplete="new-password" placeholder="الرمز الرسمي"><button class="primary" id="saveProviderBtn">حفظ إعدادات المزوّد</button><button id="loadProviderSettingsBtn">تحميل حالة الإعدادات</button><p id="providerSettingsMsg" aria-live="polite"></p><small id="providerSettingsStatus"></small></div>
-<div class="card"><h2>اختبار العرض التجريبي</h2><p class="muted">يضيف سجلاً تجريبياً فقط. لا يمثل حركة مرور أو ربحاً فعلياً.</p><button id="demoBtn">إضافة 0.01 USD تجريبية</button><button class="primary" id="refreshBtn">تحديث بيانات المزوّد</button><p id="actionMsg" aria-live="polite"></p></div>
-<div class="card"><h2>طلب سحب للمراجعة</h2><p class="notice">السحب حالياً يسجل طلباً داخلياً فقط؛ لا توجد معاملة USDT تُرسل تلقائياً.</p><label>المبلغ (USD)</label><input id="withdrawAmount" type="number" min="0.01" step="0.01" placeholder="0.01"><label>عنوان محفظة الاستلام</label><input id="wallet" maxlength="120" placeholder="عنوان المحفظة"><button id="withdrawBtn">تسجيل طلب السحب</button></div>
-<div class="card"><h2>سجل الحساب</h2><div class="scroll"><table><thead><tr><th>النوع</th><th>المبلغ</th><th>العملة</th><th>الحالة</th><th>المرجع</th><th>التاريخ</th></tr></thead><tbody id="ledger"><tr><td colspan="6">لا توجد سجلات</td></tr></tbody></table></div></div></section>
-<footer class="muted">RoarNet Partner-Ready Starter · لا توجد أرباح مضمونة.</footer></main><script>
-const $=id=>document.getElementById(id);async function api(path,method='GET',body){const r=await fetch(path,{method,headers:{'Content-Type':'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined});const j=await r.json();if(!r.ok)throw new Error(j.error||'فشل الطلب');return j;}function msg(id,text,err=false){$(id).textContent=text;$(id).className=err?'error':'success'}
-async function load(){const d=await api('/api/dashboard');$('confirmed').textContent=d.totals.confirmedUsd.toFixed(6)+' USD';$('demo').textContent=d.totals.demoUsd.toFixed(6)+' USD';$('pending').textContent=d.totals.pendingPayoutUsd.toFixed(6)+' USD';$('provider').textContent=d.provider.enabled?d.provider.name:'غير مربوط';$('providerNote').textContent=d.provider.accountLinked?'مفاتيح حساب موجودة؛ تحقق من اعتماد المزوّد':'بانتظار موافقة الشراكة والمفاتيح الرسمية';$('ledger').innerHTML='';for(const x of d.ledger){const tr=document.createElement('tr');for(const v of [x.kind,x.amount,x.currency,x.status,x.reference,x.created_at]){const td=document.createElement('td');td.textContent=String(v);tr.appendChild(td)}$('ledger').appendChild(tr)}if(!d.ledger.length)$('ledger').innerHTML='<tr><td colspan="6">لا توجد سجلات</td></tr>';}
-async function boot(){try{const s=await api('/api/session');if(s.authenticated){$('login').classList.add('hidden');$('app').classList.remove('hidden');await load();await loadProviderSettings();$('status').textContent='مسجل الدخول'}else{$('status').textContent='يتطلب تسجيل الدخول'}}catch(e){$('status').textContent='الخادم غير جاهز'}}
-$('loginBtn').onclick=async()=>{try{await api('/api/login','POST',{username:$('username').value,password:$('password').value});$('login').classList.add('hidden');$('app').classList.remove('hidden');msg('loginMsg','تم الدخول');await load();await loadProviderSettings()}catch(e){msg('loginMsg',e.message,true)}};
-async function loadProviderSettings(){try{const s=await api('/api/provider/settings');$('providerNameInput').value=s.name==='unconfigured'?'':s.name;$('providerApiBaseInput').value=s.apiBase||'';$('providerDeviceIdInput').value=s.deviceId||'';$('providerApiKeyInput').value='';$('providerDeviceTokenInput').value='';$('providerApiKeyInput').placeholder=s.hasApiKey?'مفتاح محفوظ؛ اتركه فارغاً للاحتفاظ به':'أدخل مفتاح API الرسمي';$('providerDeviceTokenInput').placeholder=s.hasDeviceToken?'رمز محفوظ؛ اتركه فارغاً للاحتفاظ به':'أدخل رمز الجهاز';$('providerSettingsStatus').textContent=`الإعدادات: ${s.configured?'مكتملة':'غير مكتملة'}؛ الاتصال: ${s.enabled?'مفعّل على الخادم':'متوقف بانتظار اعتماد المزوّد'}`;}catch(e){msg('providerSettingsMsg',e.message,true)}}
-$('saveProviderBtn').onclick=async()=>{try{const r=await api('/api/provider/settings','POST',{name:$('providerNameInput').value,apiBase:$('providerApiBaseInput').value,deviceId:$('providerDeviceIdInput').value,apiKey:$('providerApiKeyInput').value,deviceToken:$('providerDeviceTokenInput').value});$('providerApiKeyInput').value='';$('providerDeviceTokenInput').value='';msg('providerSettingsMsg',r.message);await loadProviderSettings();await load()}catch(e){msg('providerSettingsMsg',e.message,true)}};$('loadProviderSettingsBtn').onclick=loadProviderSettings;
-$('logoutBtn').onclick=async()=>{await api('/api/logout','POST',{});location.reload()};$('demoBtn').onclick=async()=>{try{const r=await api('/api/demo-credit','POST',{amount:.01});msg('actionMsg',r.notice);await load()}catch(e){msg('actionMsg',e.message,true)}};$('refreshBtn').onclick=async()=>{try{const r=await api('/api/provider/refresh','POST',{});msg('actionMsg',r.message);await load()}catch(e){msg('actionMsg',e.message,true)}};$('withdrawBtn').onclick=async()=>{try{const r=await api('/api/withdrawals','POST',{amount:Number($('withdrawAmount').value),wallet:$('wallet').value});msg('actionMsg',`${r.message} المرجع: ${r.reference}`);await load()}catch(e){msg('actionMsg',e.message,true)}};boot();
-</script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="RoarNet — مشروع لتطوير حلول مشاركة موارد الإنترنت وإدارة الترافيك.">
+  <title>RoarNet — مشروع مشاركة الإنترنت</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: #eef3ff;
+      background: #101827;
+      font-family: system-ui, sans-serif;
+    }
+    main {
+      width: 100%;
+      max-width: 720px;
+      padding: 36px 24px;
+      text-align: center;
+      border: 1px solid #34435b;
+      border-radius: 22px;
+      background: #172338;
+    }
+    .lion { font-size: 56px; }
+    h1 { margin: 12px 0; font-size: 38px; }
+    p {
+      color: #c4cee0;
+      line-height: 1.9;
+      font-size: 17px;
+    }
+    a {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 12px 22px;
+      border-radius: 10px;
+      background: #d9e6ff;
+      color: #101827;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    footer { margin-top: 28px; color: #94a3b8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="lion">🦁</div>
+    <h1>RoarNet</h1>
+    <p><strong>نحو حلول أفضل لمشاركة موارد الإنترنت.</strong></p>
+    <p>
+      RoarNet مشروع قيد التطوير لبناء منصة لإدارة مشاركة موارد الإنترنت
+      وقياس الترافيك، مع العمل على تطوير نظام واضح لحساب الحصص
+      وحقوق المشاركين.
+    </p>
+    <p>سيتم الإعلان عن الخدمات المتاحة بعد استكمال التطوير والتحقق من تكاملات المزوّدين.</p>
+    <a href="https://github.com/ma2871429-cmd/RoarNet"
+       target="_blank" rel="noopener noreferrer">عرض المشروع على GitHub</a>
+    <footer>RoarNet · الموقع الرسمي للمشروع</footer>
+  </main>
+</body>
+</html>
