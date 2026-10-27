@@ -617,6 +617,12 @@ $('createCustomer').onclick=async()=>{
   }catch(e){say('newCustomer','تعذّر إنشاء الحساب: '+e.message)}
 };
 </script>
+
+<div id="roarnet-adsterra-banner" style="width:320px;max-width:100%;min-height:50px;margin:20px auto;text-align:center;overflow:hidden">
+<script>atOptions={'key':'ee2af095a2b5972a5b6691bec44bbac2','format':'iframe','height':50,'width':320,'params':{}};</script>
+<script src="https://bauval.org/22/ee2af095a2b5972a5b6691bec44bbac2"></script>
+</div>
+
 </body></html>`.replaceAll('\\`', '`').replaceAll('\\${', '${');
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
@@ -624,7 +630,7 @@ $('createCustomer').onclick=async()=>{
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'"
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://bauval.org; frame-src 'self' https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bauval.org; img-src 'self' data: https://bauval.org; base-uri 'none'; frame-ancestors 'none'"
       });
       return res.end(page);
     }
@@ -1199,13 +1205,16 @@ $('createCustomer').onclick=async()=>{
         if (e.message === 'ORDER_STATE_CHANGED') return json(res, 409, { error: 'Order state changed; reload orders' });
         throw e;
       }
-      const shareCompany = Math.floor(netCents * 0.8);
+      const ownerCents = Math.floor(netCents * 80 / 100);
+      const participantCents = Math.floor(netCents * 15 / 100);
+      const reserveCents = netCents - ownerCents - participantCents;
       return json(res, 200, {
         ok: true, orderId: order.id, status: 'paid',
         grossUsd: Number((Number(order.price_cents) / 100).toFixed(2)),
         verifiedNetUsd: Number((netCents / 100).toFixed(2)),
-        companyShare80Usd: Number((shareCompany / 100).toFixed(2)),
-        participantPool20Usd: Number(((netCents - shareCompany) / 100).toFixed(2)),
+        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
+        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
         note: 'Manual confirmation only: use after independently verifying the funds arrived. This endpoint does not contact a payment provider or send payouts.'
       });
     }
@@ -1267,13 +1276,18 @@ $('createCustomer').onclick=async()=>{
         'SELECT COALESCE(SUM(net_cents),0) AS cents FROM net_revenue'
       ).get().cents;
 
+      const ownerCents = Math.floor(cents * 80 / 100);
+      const participantCents = Math.floor(cents * 15 / 100);
+      const reserveCents = cents - ownerCents - participantCents;
+
       return json(res, 200, {
         activeNodes: nodes,
         meteredBytes: Number(usage.bytes),
         usageEvents: Number(usage.events),
         recordedNetRevenueUsd: Number((cents / 100).toFixed(2)),
-        companyShare80Usd: Number((Math.floor(cents * 0.8) / 100).toFixed(2)),
-        userShare20Usd: Number(((cents - Math.floor(cents * 0.8)) / 100).toFixed(2)),
+        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
+        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
         paidOrderCount: Number(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE status='paid'").get().n),
         pendingOrderCount: Number(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE status='pending'").get().n),
         note: 'Only manually verified paid orders add net revenue. This core does not yet connect to an automatic payment provider or send payouts.'
@@ -1305,10 +1319,17 @@ $('createCustomer').onclick=async()=>{
         throw e;
       }
 
+      const ownerCents = Math.floor(cents * 80 / 100);
+      const participantCents = Math.floor(cents * 15 / 100);
+      const reserveCents = cents - ownerCents - participantCents;
+
       return json(res, 201, {
         ok: true,
         recordedNetUsd: cents / 100,
-        note: 'Record only verified net revenue actually received. This does not move money or pay users.'
+        ownerShare80Usd: ownerCents / 100,
+        participantPool15Usd: participantCents / 100,
+        operatingReserve5Usd: reserveCents / 100,
+        note: 'Shares are calculated from verified net revenue. This does not move money or pay users.'
       });
     }
 
