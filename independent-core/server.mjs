@@ -205,6 +205,15 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
+    if (req.method === "GET" && url.pathname === "/google851250a9e589b228.html") {
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      });
+      return res.end("google-site-verification: google851250a9e589b228.html");
+    }
+
     // ROARNET_UNIFIED_UI_V1
     if (req.method === 'GET' && url.pathname === '/') {
       const page = String.raw`<!doctype html>
