@@ -205,6 +205,28 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
+    if (req.method === "GET" && url.pathname === "/sitemap.xml") {
+      const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+        '<url><loc>https://roarnet.hostless.app/</loc></url>' +
+        '</urlset>';
+      res.writeHead(200, {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+        "X-Content-Type-Options": "nosniff"
+      });
+      return res.end(xml);
+    }
+
+    if (req.method === "GET" && url.pathname === "/robots.txt") {
+      res.writeHead(200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+        "X-Content-Type-Options": "nosniff"
+      });
+      return res.end("User-agent: *\nAllow: /\nSitemap: https://roarnet.hostless.app/sitemap.xml\n");
+    }
+
     if (req.method === "GET" && url.pathname === "/google851250a9e589b228.html") {
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
