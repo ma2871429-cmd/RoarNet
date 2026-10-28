@@ -24,8 +24,14 @@ if (ADMIN.length < 32 || !Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   process.exit(1);
 }
 
-const DB_PATH = process.env.DB_PATH || path.join(root, 'data', 'roarnet.sqlite');
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const DB_PATH = process.env.DB_PATH || (
+  process.env.NODE_ENV === 'production'
+    ? path.join(root, 'roarnet.sqlite')
+    : path.join(root, 'data', 'roarnet.sqlite')
+);
+if (process.env.NODE_ENV !== 'production') {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+}
 const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
