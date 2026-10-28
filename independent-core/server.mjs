@@ -29,10 +29,31 @@ const DB_PATH = process.env.DB_PATH || (
     ? path.join(root, 'roarnet.sqlite')
     : path.join(root, 'data', 'roarnet.sqlite')
 );
-if (process.env.NODE_ENV !== 'production') {
+try {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+} catch (err) {
+  console.error('Cannot prepare SQLite database directory:', err.message);
+  process.exit(1);
 }
-const db = new DatabaseSync(DB_PATH);
+
+let db;
+try {
+  db = new DatabaseSync(DB_PATH);
+} catch (err) {
+  console.error('Cannot open SQLite database:', DB_PATH, err.message);
+  process.exit(1);
+}
+
+ // ROARNET_IP_ANALYTICS_V1
+ db.exec(`
+   CREATE TABLE IF NOT EXISTS participant_ip_fingerprints (
+     node_id TEXT NOT NULL REFERENCES nodes(id),
+     ip_fingerprint TEXT NOT NULL,
+     first_seen_at TEXT NOT NULL,
+     last_seen_at TEXT NOT NULL,
+     PRIMARY KEY(node_id, ip_fingerprint)
+   );
+ `);
 
 db.exec(`
   PRAGMA journal_mode=WAL;
@@ -348,8 +369,7 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 <h2>مشاركة الإنترنت والربح</h2>
 <p>تقدر تبدأ من هنا بطلب تسجيل مشارك، باستخدام رمز الإدارة لإنشاء سجل مشارك.</p>
 <div class="card">
-<label for="shareAdminToken">رمز الإدارة لتسجيل المشارك</label>
-<input id="shareAdminToken" type="password" autocomplete="off" placeholder="رمز الإدارة">
+<p>يُستخدم رمز الإدارة المُدخل في لوحة الإدارة لتسجيل المشارك.</p>
 <label for="nodeLabel">اسم المشارك أو الجهاز</label>
 <input id="nodeLabel" maxlength="80" placeholder="مثال: جهاز البيت">
 <button class="primary" id="registerNode">تسجيل المشارك</button>
@@ -387,6 +407,15 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 </div>
 <button type="button" id="loadAnalytics">تحديث إحصائيات الزيارات والمشاركة</button>
 <div id="analyticsStatus" class="status" aria-live="polite">لم يتم تحميل الإحصائيات.</div>
+
+
+<section class="card" id="maintenanceBot">
+  <h3>بوت صيانة RoarNet</h3>
+  <p>يفحص مسارات الإدارة المتاحة ويعرض تشخيصاً أولياً للاتصال.</p>
+  <button class="primary" id="runMaintenanceBot" type="button">تشغيل فحص الصيانة</button>
+  <div class="status" id="maintenanceBotStatus" aria-live="polite">جاهز للفحص.</div>
+  <pre id="maintenanceBotReport" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+</section>
 
 <div id="adminStatus" class="status" aria-live="polite">لم يتم تحميل البيانات.</div>
 
@@ -446,11 +475,9 @@ function applyRoarNetDefaults(){
   }
 
   const customerToken = $('customerToken');
-  const shareAdminToken = $('shareAdminToken');
   const adminTokenField = $('adminToken');
 
   if (customerToken) customerToken.setAttribute('autocomplete', 'off');
-  if (shareAdminToken) shareAdminToken.setAttribute('autocomplete', 'off');
   if (adminTokenField) adminTokenField.setAttribute('autocomplete', 'off');
 }
 
@@ -533,7 +560,7 @@ $('loadBalance').onclick=async()=>{
   }catch(e){say('balance','تعذّر جلب الرصيد: '+e.message)}
 };
 $('registerNode').onclick=async()=>{
-  const token=$('shareAdminToken').value.trim(),label=$('nodeLabel').value.trim();
+  const token=adminToken(),label=$('nodeLabel').value.trim();
   if(!token||!label){say('shareStatus','أدخل رمز الإدارة واسم المشارك.');return}
   $('registerNode').disabled=true;
   try{const r=await api('/api/admin/nodes',{method:'POST',token,data:{label}});
@@ -717,6 +744,98 @@ $('createCustomer').onclick=async()=>{
 <script src="https://bauval.org/22/ee2af095a2b5972a5b6691bec44bbac2"></script>
 </div>
 
+
+<script>
+/* ROARNET_MAINTENANCE_BOT_V1 */
+(function () {
+  const button = document.getElementById('runMaintenanceBot');
+  const status = document.getElementById('maintenanceBotStatus');
+  const report = document.getElementById('maintenanceBotReport');
+
+  if (!button || !status || !report) return;
+
+  button.addEventListener('click', async function () {
+    const tokenField = document.getElementById('adminToken');
+    const token = tokenField ? tokenField.value.trim() : '';
+
+    report.textContent = '';
+    if (!token) {
+      status.textContent = 'أدخل رمز الإدارة في لوحة الإدارة أولاً.';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'جارٍ فحص مسارات الإدارة...';
+
+    const checks = [
+      { name: 'ملخص الإدارة', path: '/api/admin/summary' },
+      { name: 'حالة مزوّد الخدمة', path: '/api/admin/provider/status' },
+      { name: 'تحليلات الشبكة', path: '/api/admin/analytics' },
+      { name: 'ملخص الترافيك', path: '/api/admin/traffic-summary' }
+    ];
+
+    const results = await Promise.all(checks.map(async function (check) {
+      try {
+        const data = await api(check.path, { token: token });
+        return { name: check.name, ok: true, data: data };
+      } catch (error) {
+        return {
+          name: check.name,
+          ok: false,
+          error: String(error && error.message ? error.message : 'تعذر الطلب')
+        };
+      }
+    }));
+
+    const lines = [
+      'تقرير صيانة RoarNet',
+      'الوقت: ' + new Date().toLocaleString(),
+      '------------------------------'
+    ];
+
+    let failed = 0;
+
+    results.forEach(function (result) {
+      if (!result.ok) {
+        failed++;
+        lines.push('[تعذر الفحص] ' + result.name + ': ' + result.error);
+        return;
+      }
+
+      lines.push('[استجابة ناجحة] ' + result.name);
+
+      if (result.name === 'حالة مزوّد الخدمة') {
+        if (result.data && result.data.configured === false) {
+          lines.push('التشخيص: مفتاح المزوّد غير مضبوط على الخادم.');
+        } else if (result.data && result.data.connected === false) {
+          lines.push('التشخيص: المزوّد غير متصل أو رفض الطلب؛ راجع إعداداته وسجلات الخادم.');
+        } else if (result.data && result.data.connected === true) {
+          lines.push('التشخيص: الخادم أفاد بأن اتصال المزوّد ناجح.');
+        } else {
+          lines.push('التشخيص: الاستجابة وصلت؛ تفاصيل حالة المزوّد غير مكتملة.');
+        }
+      }
+    });
+
+    lines.push('------------------------------');
+
+    if (failed === 0) {
+      lines.push('الخلاصة: جميع مسارات الفحص الأربعة استجابت.');
+    } else {
+      lines.push('الخلاصة: تعذر إكمال ' + failed + ' من أصل ' + checks.length + ' فحوصات.');
+      lines.push('هذا وحده لا يثبت وجود عطل عام؛ راجع الخطأ المحدد وسجلات الخادم.');
+    }
+
+    lines.push('');
+    lines.push('هذا فحص أولي للقراءة فقط، ولا ينفذ إصلاحات تلقائية.');
+
+    report.textContent = lines.join('\n');
+    status.textContent = 'انتهى الفحص.';
+    button.disabled = false;
+  });
+})();
+</script>
+
 </body></html>`.replaceAll('\\`', '`').replaceAll('\\${', '${');
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
@@ -890,6 +1009,30 @@ $('createCustomer').onclick=async()=>{
         throw e;
       }
 
+      // ROARNET_IP_CAPTURE_V1
+      // Fail closed: لا نثق بالترويسة إلا بعد تأكيد إعداد البروكسي.
+      const ipSecret = process.env.ROARNET_IP_HMAC_SECRET || '';
+      const ipHeader = (process.env.ROARNET_CLIENT_IP_HEADER || '').toLowerCase();
+      if (ipSecret.length >= 32 &&
+          process.env.ROARNET_PROXY_IP_HEADER_TRUSTED === 'yes' &&
+          /^[a-z0-9-]+$/.test(ipHeader)) {
+        const raw = String(req.headers[ipHeader] || '').trim();
+        // نقبل عنوانًا واحدًا فقط؛ لا نختار عنوانًا من قائمة Forwarded غير موثوقة.
+        if (raw && !raw.includes(',') && raw.length <= 100 &&
+            !/[\s;]/.test(raw)) {
+          const fingerprint = crypto.createHmac('sha256', ipSecret)
+            .update(raw).digest('hex');
+          const stamp = now();
+          db.prepare(`
+            INSERT INTO participant_ip_fingerprints
+              (node_id, ip_fingerprint, first_seen_at, last_seen_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(node_id, ip_fingerprint)
+            DO UPDATE SET last_seen_at=excluded.last_seen_at
+          `).run(node.id, fingerprint, stamp, stamp);
+        }
+      }
+
       return json(res, 201, { ok: true, recordedBytes: bytes });
     }
 
@@ -1042,7 +1185,14 @@ $('createCustomer').onclick=async()=>{
         registeredParticipants: Number(registered.total || 0),
         consentedParticipants: Number(consented.total || 0),
         participantsWithTrafficThisMonth: Number(reporting.total || 0),
-        distinctVerifiedIps: null,
+        distinctVerifiedIps: (() => {
+          const secret = process.env.ROARNET_IP_HMAC_SECRET || '';
+          if (secret.length < 32 ||
+              process.env.ROARNET_PROXY_IP_HEADER_TRUSTED !== 'yes') return null;
+          return Number(db.prepare(
+            'SELECT COUNT(DISTINCT ip_fingerprint) AS n FROM participant_ip_fingerprints'
+          ).get().n);
+        })(),
         note: 'هذه أعداد سجلات وزيارات وأحداث مسجلة؛ لا تمثل عناوين IP فريدة مؤكدة أو حركة مستقلة مدققة.'
       });
     }
