@@ -376,6 +376,18 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 <div class="card"><small>طلبات مدفوعة</small><strong id="paidOrders">—</strong></div>
 <div class="card"><small>طلبات معلّقة</small><strong id="pendingOrders">—</strong></div>
 </div>
+<h3>إحصائيات الزيارات والمشاركة</h3>
+<div class="grid">
+<div class="card"><small>الزيارات اليوم</small><strong id="visitsToday">—</strong></div>
+<div class="card"><small>إجمالي الزيارات المسجلة</small><strong id="visitsTotal">—</strong></div>
+<div class="card"><small>المشاركون المسجلون</small><strong id="registeredParticipants">—</strong></div>
+<div class="card"><small>موافقات المشاركة النشطة</small><strong id="consentedParticipants">—</strong></div>
+<div class="card"><small>مشاركون لديهم حركة مسجلة هذا الشهر</small><strong id="trafficParticipants">—</strong></div>
+<div class="card"><small>عناوين IP الفريدة المؤكدة</small><strong>غير متاحة</strong></div>
+</div>
+<button type="button" id="loadAnalytics">تحديث إحصائيات الزيارات والمشاركة</button>
+<div id="analyticsStatus" class="status" aria-live="polite">لم يتم تحميل الإحصائيات.</div>
+
 <div id="adminStatus" class="status" aria-live="polite">لم يتم تحميل البيانات.</div>
 
 <h3>إدارة الباقات</h3>
@@ -531,6 +543,17 @@ $('registerNode').onclick=async()=>{
   finally{$('registerNode').disabled=false}
 };
 function adminToken(){return $('adminToken').value.trim()}
+$('loadAnalytics').onclick=async()=>{
+  try{
+    const r=await api('/api/admin/analytics',{token:adminToken()});
+    $('visitsToday').textContent=r.visitsToday;
+    $('visitsTotal').textContent=r.visitsTotal;
+    $('registeredParticipants').textContent=r.registeredParticipants;
+    $('consentedParticipants').textContent=r.consentedParticipants;
+    $('trafficParticipants').textContent=r.participantsWithTrafficThisMonth;
+    say('analyticsStatus',r.note||'تم تحديث الإحصائيات.');
+  }catch(e){say('analyticsStatus','تعذّر تحميل الإحصائيات: '+e.message)}
+};
 $('loadAdmin').onclick=async()=>{
   try{const r=await api('/api/admin/summary',{token:adminToken()});
     $('activeNodes').textContent=r.activeNodes??'—';
@@ -991,6 +1014,36 @@ $('createCustomer').onclick=async()=>{
       return json(res, 201, {
         id, label, status: 'active', customerToken,
         warning: 'Save customerToken securely; it is shown only once.'
+      });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/admin/analytics') {
+      if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
+
+      const visits = db.prepare(
+        'SELECT COUNT(*) AS total, SUM(CASE WHEN visit_day=? THEN 1 ELSE 0 END) AS today FROM page_visits'
+      ).get(now().slice(0, 10));
+
+      const registered = db.prepare(
+        'SELECT COUNT(*) AS total FROM nodes'
+      ).get();
+
+      const consented = db.prepare(
+        'SELECT COUNT(DISTINCT node_id) AS total FROM sharing_consents WHERE accepted_at IS NOT NULL AND revoked_at IS NULL'
+      ).get();
+
+      const reporting = db.prepare(
+        'SELECT COUNT(DISTINCT node_id) AS total FROM traffic_events WHERE month_key=?'
+      ).get(now().slice(0, 7));
+
+      return json(res, 200, {
+        visitsToday: Number(visits.today || 0),
+        visitsTotal: Number(visits.total || 0),
+        registeredParticipants: Number(registered.total || 0),
+        consentedParticipants: Number(consented.total || 0),
+        participantsWithTrafficThisMonth: Number(reporting.total || 0),
+        distinctVerifiedIps: null,
+        note: 'هذه أعداد سجلات وزيارات وأحداث مسجلة؛ لا تمثل عناوين IP فريدة مؤكدة أو حركة مستقلة مدققة.'
       });
     }
 
