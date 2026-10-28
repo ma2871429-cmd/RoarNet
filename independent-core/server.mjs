@@ -85,6 +85,12 @@ db.exec(`
       ON traffic_events(node_id, month_key);
     CREATE INDEX IF NOT EXISTS idx_traffic_customer_month
       ON traffic_events(customer_id, month_key);
+    CREATE INDEX IF NOT EXISTS idx_traffic_customer_bytes
+      ON traffic_events(customer_id, bytes);
+    CREATE INDEX IF NOT EXISTS idx_traffic_node_month_bytes
+      ON traffic_events(node_id, month_key, bytes);
+    CREATE INDEX IF NOT EXISTS idx_traffic_customer_month_bytes
+      ON traffic_events(customer_id, month_key, bytes);
   `);
 
 
@@ -128,6 +134,22 @@ const seedPackage = db.prepare('INSERT OR IGNORE INTO packages(id,name,bytes,pri
 seedPackage.run('starter-1gb', 'Starter 1 GB (draft price)', 1_000_000_000, 100, new Date().toISOString(),);
 seedPackage.run('standard-10gb', 'Standard 10 GB (draft price)', 10_000_000_000, 500, new Date().toISOString(),);
 seedPackage.run('large-50gb', 'Large 50 GB (draft price)', 50_000_000_000, 2000, new Date().toISOString(),);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS page_visits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    visit_day TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_page_visits_day ON page_visits(visit_day);
+`);
+
+const addPageVisit = db.prepare(
+  'INSERT INTO page_visits (visit_day, created_at) VALUES (?, ?)'
+);
+const getBaghdadDay = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
 
 const hash = x => crypto.createHash('sha256').update(x).digest('hex');
 const now = () => new Date().toISOString();
@@ -236,8 +258,20 @@ const server = http.createServer(async (req, res) => {
       return res.end("google-site-verification: google851250a9e589b228.html");
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/visits/stats') {
+      const today = getBaghdadDay();
+      const visitsToday = db.prepare(
+        'SELECT COUNT(*) AS count FROM page_visits WHERE visit_day = ?'
+      ).get(today).count;
+      const totalVisits = db.prepare(
+        'SELECT COUNT(*) AS count FROM page_visits'
+      ).get().count;
+      return json(res, 200, { today, visitsToday, totalVisits });
+    }
+
     // ROARNET_UNIFIED_UI_V1
     if (req.method === 'GET' && url.pathname === '/') {
+      addPageVisit.run(getBaghdadDay(), now());
       const page = String.raw`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
