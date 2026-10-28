@@ -175,5 +175,57 @@
 </div>
 <!-- End RoarNet Adsterra mobile banner -->
 
+
+<!-- ROARNET_SUPABASE_LOGIN_V1 -->
+<section id="rn-auth" style="max-width:520px;margin:30px auto;padding:22px;border:1px solid #34435b;border-radius:18px;background:#172338;color:#eef3ff;text-align:center">
+  <h2>تسجيل الدخول إلى RoarNet</h2>
+  <p>أدخل بريدك الإلكتروني حتى يصلك رابط تسجيل الدخول.</p>
+  <form id="rn-auth-form">
+    <input id="rn-auth-email" type="email" required autocomplete="email" placeholder="البريد الإلكتروني"
+      style="width:100%;padding:13px;margin:8px 0;border-radius:9px;border:1px solid #64748b">
+    <button type="submit" style="padding:12px 20px;border:0;border-radius:9px;cursor:pointer;font-weight:bold">إرسال رابط الدخول</button>
+  </form>
+  <p id="rn-auth-status" role="status" aria-live="polite"></p>
+  <div id="rn-auth-user" hidden>
+    <p>تم تسجيل الدخول بالبريد: <strong id="rn-auth-email-view"></strong></p>
+    <button id="rn-auth-logout" type="button">تسجيل الخروج</button>
+  </div>
+</section>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase = createClient('https://bsmumxfajnzhziezxfth.supabase.co', 'sb_publishable_gwrF_3Sk1dRDN7HoMXpTFw_4qctnZob');
+const form = document.getElementById('rn-auth-form');
+const statusBox = document.getElementById('rn-auth-status');
+const userBox = document.getElementById('rn-auth-user');
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  statusBox.textContent = 'جارٍ إرسال رابط الدخول...';
+  const email = document.getElementById('rn-auth-email').value.trim();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  statusBox.textContent = error
+    ? 'تعذّر إرسال الرابط: ' + error.message
+    : 'إذا كان البريد صالحاً، ستصلك رسالة تحتوي رابط تسجيل الدخول.';
+});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  const email = session?.user?.email;
+  userBox.hidden = !email;
+  form.hidden = Boolean(email);
+  document.getElementById('rn-auth-email-view').textContent = email || '';
+  if (email) statusBox.textContent = 'تم تسجيل الدخول بنجاح.';
+});
+
+document.getElementById('rn-auth-logout').addEventListener('click', async () => {
+  const { error } = await supabase.auth.signOut();
+  statusBox.textContent = error ? 'تعذّر تسجيل الخروج.' : 'تم تسجيل الخروج.';
+});
+</script>
+<!-- /ROARNET_SUPABASE_LOGIN_V1 -->
+
 </body>
 </html>
