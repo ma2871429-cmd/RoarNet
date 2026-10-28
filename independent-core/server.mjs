@@ -285,6 +285,35 @@ const server = http.createServer(async (req, res) => {
       return res.end("google-site-verification: google851250a9e589b228.html");
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/public/stats') {
+      const registered = db.prepare('SELECT COUNT(*) AS n FROM nodes').get();
+      const consented = db.prepare(
+        'SELECT COUNT(*) AS n FROM sharing_consents WHERE accepted_at IS NOT NULL AND revoked_at IS NULL'
+      ).get();
+      const visits = db.prepare('SELECT COUNT(*) AS n FROM page_visits').get();
+      const ipConfig = (process.env.ROARNET_IP_HMAC_SECRET || '').length >= 32 &&
+        process.env.ROARNET_PROXY_IP_HEADER_TRUSTED === 'yes';
+      let distinctIps = null;
+      let activeIps24h = null;
+      if (ipConfig) {
+        distinctIps = Number(db.prepare(
+          'SELECT COUNT(DISTINCT ip_fingerprint) AS n FROM participant_ip_fingerprints'
+        ).get().n);
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        activeIps24h = Number(db.prepare(
+          'SELECT COUNT(DISTINCT ip_fingerprint) AS n FROM participant_ip_fingerprints WHERE last_seen_at >= ?'
+        ).get(cutoff).n);
+      }
+      return json(res, 200, {
+        registeredParticipants: Number(registered.n),
+        consentedParticipants: Number(consented.n),
+        totalVisits: Number(visits.n),
+        distinctIps,
+        activeIps24h,
+        note: 'الأرقام تخص السجلات المسجلة فقط. إحصاءات IP تعتمد على إعدادات الخادم وبيانات المشاركين المبلّغين.'
+      });
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/visits/stats') {
       const today = getBaghdadDay();
       const visitsToday = db.prepare(
@@ -340,6 +369,17 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 </head>
 <body>
 <header><div class="logo">RoarNet</div><p>بوابتك لإدارة الباقات ومشاركة الإنترنت</p></header>
+<section class="card" id="publicStats" style="max-width:980px;margin:14px auto;padding:14px">
+<h3 style="margin-top:0">إحصائيات RoarNet</h3>
+<div class="grid">
+<div class="card"><small>المشاركون المسجلون</small><strong id="publicParticipants">—</strong></div>
+<div class="card"><small>موافقات المشاركة النشطة</small><strong id="publicConsented">—</strong></div>
+<div class="card"><small>الزيارات المسجلة</small><strong id="publicVisits">—</strong></div>
+<div class="card"><small>عناوين IP المميزة</small><strong id="publicIps">—</strong></div>
+<div class="card"><small>عناوين IP النشطة خلال 24 ساعة</small><strong id="publicIps24h">—</strong></div>
+</div>
+<small id="publicStatsNote">جارٍ تحميل الإحصائيات...</small>
+</section>
 <main>
 <nav>
 <button class="tab active" data-tab="store">شراء الإنترنت</button>
@@ -403,7 +443,8 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 <div class="card"><small>المشاركون المسجلون</small><strong id="registeredParticipants">—</strong></div>
 <div class="card"><small>موافقات المشاركة النشطة</small><strong id="consentedParticipants">—</strong></div>
 <div class="card"><small>مشاركون لديهم حركة مسجلة هذا الشهر</small><strong id="trafficParticipants">—</strong></div>
-<div class="card"><small>عناوين IP الفريدة المؤكدة</small><strong>غير متاحة</strong></div>
+<div class="card"><small>عناوين IP المميزة المسجلة</small><strong id="distinctIps">—</strong></div>
+<div class="card"><small>عناوين IP النشطة خلال 24 ساعة</small><strong id="activeIps24h">—</strong></div>
 </div>
 <button type="button" id="loadAnalytics">تحديث إحصائيات الزيارات والمشاركة</button>
 <div id="analyticsStatus" class="status" aria-live="polite">لم يتم تحميل الإحصائيات.</div>
@@ -448,6 +489,20 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function say(id,msg){$(id).textContent=msg}
+async function loadPublicStats(){
+  try {
+    const r = await api('/api/public/stats');
+    $('publicParticipants').textContent = r.registeredParticipants;
+    $('publicConsented').textContent = r.consentedParticipants;
+    $('publicVisits').textContent = r.totalVisits;
+    $('publicIps').textContent = r.distinctIps ?? 'غير متاح';
+    $('publicIps24h').textContent = r.activeIps24h ?? 'غير متاح';
+    $('publicStatsNote').textContent = r.note;
+  } catch {
+    $('publicStatsNote').textContent = 'تعذر تحميل الإحصائيات حالياً.';
+  }
+}
+
 async function api(path,{token='',method='GET',data}={}){
   const headers={Accept:'application/json'};
   if(token) headers.Authorization='Bearer '+token;
@@ -498,6 +553,7 @@ document.querySelectorAll('input[type="number"]').forEach(field => {
 
 // END ROARNET_SAFE_AUTOFILL_V1
 
+loadPublicStats();
 document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{
   document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===button));
   document.querySelectorAll('section.panel').forEach(p=>p.classList.toggle('active',p.id===button.dataset.tab));
@@ -578,6 +634,8 @@ $('loadAnalytics').onclick=async()=>{
     $('registeredParticipants').textContent=r.registeredParticipants;
     $('consentedParticipants').textContent=r.consentedParticipants;
     $('trafficParticipants').textContent=r.participantsWithTrafficThisMonth;
+    $('distinctIps').textContent=r.distinctVerifiedIps ?? 'غير متاح';
+    $('activeIps24h').textContent=r.activeDistinctIps24h ?? 'غير متاح';
     say('analyticsStatus',r.note||'تم تحديث الإحصائيات.');
   }catch(e){say('analyticsStatus','تعذّر تحميل الإحصائيات: '+e.message)}
 };
@@ -1192,6 +1250,15 @@ $('createCustomer').onclick=async()=>{
           return Number(db.prepare(
             'SELECT COUNT(DISTINCT ip_fingerprint) AS n FROM participant_ip_fingerprints'
           ).get().n);
+        })(),
+        activeDistinctIps24h: (() => {
+          const secret = process.env.ROARNET_IP_HMAC_SECRET || '';
+          if (secret.length < 32 ||
+              process.env.ROARNET_PROXY_IP_HEADER_TRUSTED !== 'yes') return null;
+          const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          return Number(db.prepare(
+            'SELECT COUNT(DISTINCT ip_fingerprint) AS n FROM participant_ip_fingerprints WHERE last_seen_at >= ?'
+          ).get(cutoff).n);
         })(),
         note: 'هذه أعداد سجلات وزيارات وأحداث مسجلة؛ لا تمثل عناوين IP فريدة مؤكدة أو حركة مستقلة مدققة.'
       });
