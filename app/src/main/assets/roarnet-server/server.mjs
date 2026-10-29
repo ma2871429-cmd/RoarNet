@@ -90,6 +90,13 @@ db.exec(`
   );
 `);
 
+// ROARNET_ULTIMATE_PLAN_V1
+const nodeColumns = db.prepare("PRAGMA table_info(nodes)").all();
+if (!nodeColumns.some(column => column.name === 'plan')) {
+  db.exec("ALTER TABLE nodes ADD COLUMN plan TEXT NOT NULL DEFAULT 'standard'");
+}
+
+
 db.exec(`
     CREATE TABLE IF NOT EXISTS customers (
       id TEXT PRIMARY KEY,
@@ -353,6 +360,24 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { app: 'RoarNet Independent Core', status: 'running' });
     }
 
+    // ROARNET_ADMIN_NODE_PLAN_V1
+    const planMatch = url.pathname.match(/^\/api\/admin\/nodes\/([^/]+)\/plan$/);
+    if (req.method === 'PATCH' && planMatch) {
+      if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
+
+      const b = await body(req);
+      const plan = String(b.plan || '');
+      if (!['standard', 'ultimate'].includes(plan)) {
+        return json(res, 400, { error: 'Plan must be standard or ultimate' });
+      }
+
+      const nodeId = decodeURIComponent(planMatch[1]);
+      const result = db.prepare('UPDATE nodes SET plan=? WHERE id=?').run(plan, nodeId);
+      if (!result.changes) return json(res, 404, { error: 'Node not found' });
+
+      return json(res, 200, { ok: true, nodeId, plan });
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/admin/nodes') {
       if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
 
@@ -604,7 +629,11 @@ const server = http.createServer(async (req, res) => {
         'SELECT COALESCE(SUM(bytes),0) AS n FROM traffic_events WHERE customer_id=? AND month_key=?'
       ).get(customerId, monthKey).n);
 
-      if (bytes > MONTHLY_CAP_BYTES - nodeUsed) {
+      const participantPlan = db.prepare(
+        'SELECT plan FROM nodes WHERE id=?'
+      ).get(nodeId)?.plan || 'standard';
+
+      if (participantPlan !== 'ultimate' && bytes > MONTHLY_CAP_BYTES - nodeUsed) {
         return json(res, 429, {
           error: 'Participant monthly cap reached',
           capBytes: MONTHLY_CAP_BYTES,
@@ -634,7 +663,9 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, {
         ok: true,
         measuredBytes: bytes,
-        participantRemainingBytes: MONTHLY_CAP_BYTES - nodeUsed - bytes,
+        participantPlan,
+        participantRemainingBytes: participantPlan === 'ultimate' ? null : MONTHLY_CAP_BYTES - nodeUsed - bytes,
+        participantCapBytes: participantPlan === 'ultimate' ? null : MONTHLY_CAP_BYTES,
         customerRemainingBytes: MONTHLY_CAP_BYTES - customerUsed - bytes,
         month: monthKey,
         note: 'Counts events submitted by the trusted relay; it does not verify customer payment.'
