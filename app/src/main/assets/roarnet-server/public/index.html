@@ -323,6 +323,57 @@ body {
     </div>
   </section>
 
+  <section id="rn-public-stats" class="rn-section" aria-labelledby="rn-public-stats-title">
+    <div class="rn-section-heading">
+      <div>
+        <span class="rn-eyebrow">LIVE NETWORK DATA</span>
+        <h2 id="rn-public-stats-title">إحصائيات الشبكة</h2>
+      </div>
+      <span id="rn-stats-status" class="rn-live-dot" role="status">جارٍ التحديث...</span>
+    </div>
+    <div class="rn-cards">
+      <article class="rn-card">
+        <span class="rn-card-icon">♙</span>
+        <h3>المشاركون المسجلون</h3>
+        <p id="rn-stat-registered" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">إجمالي سجلات المشاركين</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">✓</span>
+        <h3>المشاركون الموافقون</h3>
+        <p id="rn-stat-consented" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">موافقة مشاركة سارية</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">↗</span>
+        <h3>زيارات الصفحة</h3>
+        <p id="rn-stat-visits" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">مرات فتح الصفحة الرئيسية</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">⇅</span>
+        <h3>ترافيك Relay المسجل</h3>
+        <p id="rn-stat-traffic" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">GB عشري · من أحداث Relay فقط</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">◉</span>
+        <h3>أحداث الترافيك</h3>
+        <p id="rn-stat-events" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">عدد سجلات Relay</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">⌁</span>
+        <h3>عناوين IP النشطة</h3>
+        <p id="rn-stat-ips" class="rn-stat-value">غير متاح</p>
+        <span class="rn-card-foot">آخر 24 ساعة · عند توفر إعداد موثوق</span>
+      </article>
+    </div>
+    <p id="rn-stats-note" class="rn-stats-note">
+      تُحدّث البيانات تلقائياً عند توفر اتصال بالخادم.
+    </p>
+  </section>
+
   <section class="rn-section rn-account-card">
     <span class="rn-card-icon">♙</span>
     <div>
@@ -389,6 +440,19 @@ body {
   border-radius:12px;
   margin-top:14px;
   padding:12px;
+}
+#rn-public-stats .rn-stat-value {
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 800;
+  color: var(--rn-cyan);
+  direction: ltr;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+#rn-public-stats .rn-stats-note {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: .8;
 }
 </style>
 
@@ -525,6 +589,56 @@ document.getElementById('rn-auth-logout').addEventListener('click', async () => 
   }));
   window.addEventListener('hashchange', update);
   update();
+})();
+</script>
+
+<script id="rn-public-stats-loader">
+(() => {
+  const number = value => Number(value || 0).toLocaleString('en-US');
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  async function loadPublicStats() {
+    const status = document.getElementById('rn-stats-status');
+    try {
+      const response = await fetch('/api/public/stats', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+
+      const data = await response.json();
+      set('rn-stat-registered', number(data.registeredParticipants));
+      set('rn-stat-consented', number(data.consentedParticipants));
+      set('rn-stat-visits', number(data.totalVisits));
+
+      const gb = Number(data.totalRelayTrafficGb);
+      set(
+        'rn-stat-traffic',
+        Number.isFinite(gb) ? gb.toLocaleString('en-US', {
+          maximumFractionDigits: 3
+        }) + ' GB' : 'غير متاح'
+      );
+
+      set('rn-stat-events', number(data.relayTrafficEvents));
+
+      const ips = data.activeIps24h;
+      set('rn-stat-ips', ips === null || ips === undefined
+        ? 'غير متاح'
+        : number(ips));
+
+      set('rn-stats-note', data.note || 'الأرقام حسب السجلات المتاحة في الخادم.');
+      if (status) status.textContent = '● تم التحديث';
+    } catch (error) {
+      if (status) status.textContent = 'تعذّر الاتصال بالخادم';
+    }
+  }
+
+  loadPublicStats();
+  window.setInterval(loadPublicStats, 60000);
 })();
 </script>
 

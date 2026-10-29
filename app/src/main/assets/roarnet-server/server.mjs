@@ -291,6 +291,12 @@ const server = http.createServer(async (req, res) => {
         'SELECT COUNT(*) AS n FROM sharing_consents WHERE accepted_at IS NOT NULL AND revoked_at IS NULL'
       ).get();
       const visits = db.prepare('SELECT COUNT(*) AS n FROM page_visits').get();
+      const relayTraffic = db.prepare(`
+        SELECT COALESCE(SUM(bytes), 0) AS bytes, COUNT(*) AS events
+        FROM traffic_events
+      `).get();
+      const totalRelayTrafficBytes = Number(relayTraffic.bytes);
+      const totalRelayTrafficGb = totalRelayTrafficBytes / 1000000000;
       const ipConfig = (process.env.ROARNET_IP_HMAC_SECRET || '').length >= 32 &&
         process.env.ROARNET_PROXY_IP_HEADER_TRUSTED === 'yes';
       let distinctIps = null;
@@ -308,6 +314,9 @@ const server = http.createServer(async (req, res) => {
         registeredParticipants: Number(registered.n),
         consentedParticipants: Number(consented.n),
         totalVisits: Number(visits.n),
+        totalRelayTrafficBytes,
+        totalRelayTrafficGb,
+        relayTrafficEvents: Number(relayTraffic.events),
         distinctIps,
         activeIps24h,
         note: 'الأرقام تخص السجلات المسجلة فقط. إحصاءات IP تعتمد على إعدادات الخادم وبيانات المشاركين المبلّغين.'
