@@ -335,7 +335,7 @@ const server = http.createServer(async (req, res) => {
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://bauval.org; frame-src 'self' https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bauval.org; img-src 'self' data: https://bauval.org; base-uri 'none'; frame-ancestors 'none'"
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://bauval.org https://esm.sh; frame-src 'self' https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bauval.org https://bsmumxfajnzhziezxfth.supabase.co; img-src 'self' data: https://bauval.org; base-uri 'none'; frame-ancestors 'none'"
       });
       return res.end(page);
     }
