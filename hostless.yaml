@@ -6,7 +6,7 @@ build:
   min_memory: 128
   max_memory: 512
 
-working_directory: independent-core
+working_directory: /
 start_command: npm start
 
 scaling:
