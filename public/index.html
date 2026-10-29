@@ -6,62 +6,340 @@
   <meta name="theme-color" content="#101827">
   <meta name="description" content="RoarNet — مشروع لتطوير حلول مشاركة موارد الإنترنت وإدارة الترافيك.">
   <title>RoarNet — مشروع مشاركة الإنترنت</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      color: #eef3ff;
-      background: #101827;
-      font-family: system-ui, sans-serif;
-    }
-    main {
-      width: 100%;
-      max-width: 720px;
-      padding: 36px 24px;
-      text-align: center;
-      border: 1px solid #34435b;
-      border-radius: 22px;
-      background: #172338;
-    }
-    .lion { font-size: 56px; }
-    h1 { margin: 12px 0; font-size: 38px; }
-    p {
-      color: #c4cee0;
-      line-height: 1.9;
-      font-size: 17px;
-    }
-    a {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 12px 22px;
-      border-radius: 10px;
-      background: #d9e6ff;
-      color: #101827;
-      text-decoration: none;
-      font-weight: 700;
-    }
-    footer { margin-top: 28px; color: #94a3b8; font-size: 13px; }
-  </style>
+<style id="rn-redesign-v1">
+:root {
+  color-scheme: dark;
+  --rn-bg: #04101f;
+  --rn-panel: #091d32;
+  --rn-panel2: #0d2940;
+  --rn-line: #164b62;
+  --rn-text: #effaff;
+  --rn-muted: #9bb7c9;
+  --rn-cyan: #13dfd0;
+  --rn-blue: #13b7d8;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 22px; }
+body {
+  display: block !important;
+  padding: 0 0 92px !important;
+  margin: 0 !important;
+  min-height: 100vh;
+  color: var(--rn-text) !important;
+  background:
+    radial-gradient(ellipse at 50% -15%, #123b57 0, transparent 55%),
+    var(--rn-bg) !important;
+  font-family: system-ui, -apple-system, "Noto Sans Arabic", sans-serif;
+}
+.rn-shell {
+  display: block;
+  width: min(100%, 760px) !important;
+  max-width: 760px !important;
+  margin: auto !important;
+  padding: 18px 17px 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  text-align: right !important;
+}
+.rn-topbar, .rn-brand, .rn-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rn-topbar { margin: 4px 0 34px; }
+.rn-brand {
+  justify-content: flex-start;
+  gap: 9px;
+  color: var(--rn-text);
+  font-size: 23px;
+  font-weight: 850;
+  text-decoration: none;
+}
+.rn-lion { font-size: 29px; }
+.rn-accent { color: var(--rn-cyan); }
+.rn-avatar {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid var(--rn-line);
+  border-radius: 15px;
+  color: var(--rn-cyan);
+  background: var(--rn-panel);
+  text-decoration: none;
+  font-size: 25px;
+}
+.rn-welcome { margin-bottom: 23px; }
+.rn-eyebrow {
+  color: var(--rn-cyan);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+.rn-welcome h1 { margin: 9px 0; font-size: clamp(26px, 6vw, 36px); }
+.rn-welcome p, .rn-hero p, .rn-card p, .rn-account-card p,
+.rn-footer p {
+  color: var(--rn-muted);
+  line-height: 1.9;
+  font-size: 14px;
+}
+.rn-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 25px 22px;
+  border: 1px solid #176078;
+  border-radius: 25px;
+  background: linear-gradient(135deg, #103b51, #09233a 65%, #07182b);
+  box-shadow: 0 16px 45px #0003;
+}
+.rn-hero-glow {
+  position: absolute;
+  width: 175px;
+  height: 175px;
+  left: -75px;
+  top: -65px;
+  border-radius: 50%;
+  background: #11dfd0;
+  filter: blur(85px);
+  opacity: .2;
+  pointer-events: none;
+}
+.rn-pill, .rn-live-dot {
+  display: inline-block;
+  padding: 7px 11px;
+  border: 1px solid #1c7180;
+  border-radius: 30px;
+  color: var(--rn-cyan);
+  background: #062334aa;
+  font-size: 11px;
+}
+.rn-hero h2 { position: relative; margin: 21px 0 8px; font-size: 26px; }
+.rn-hero p { position: relative; max-width: 430px; }
+.rn-primary, .rn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 19px;
+  margin-top: 12px;
+  border-radius: 13px;
+  background: linear-gradient(100deg, var(--rn-cyan), #08c7df);
+  color: #03202b !important;
+  font-weight: 800;
+  font-size: 14px;
+  text-decoration: none;
+}
+.rn-orbit {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  border: 1px solid #18c8d977;
+  border-radius: 50%;
+  color: #24dce0;
+  font-size: 52px;
+  font-weight: 900;
+  opacity: .17;
+}
+.rn-section { margin-top: 32px; }
+.rn-section-heading { margin-bottom: 15px; }
+.rn-section-heading h2, .rn-account-card h2 {
+  margin: 5px 0;
+  font-size: 21px;
+}
+.rn-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rn-card {
+  min-width: 0;
+  padding: 18px 15px;
+  border: 1px solid var(--rn-line);
+  border-radius: 20px;
+  background: linear-gradient(150deg, #0b2940, #07192c);
+}
+.rn-card-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: var(--rn-cyan);
+  background: #0c4052;
+  font-size: 25px;
+}
+.rn-card h3 { margin: 14px 0 5px; font-size: 16px; }
+.rn-card p { margin: 7px 0 15px; font-size: 12px; }
+.rn-card-foot { color: var(--rn-cyan); font-size: 11px; }
+.rn-account-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  padding: 19px;
+  border: 1px solid var(--rn-line);
+  border-radius: 20px;
+  background: var(--rn-panel);
+}
+.rn-account-card > div { flex: 1; min-width: 160px; }
+.rn-account-card p { margin: 5px 0; }
+.rn-secondary { margin: 0; padding: 10px 13px; font-size: 12px; }
+.rn-footer { padding: 28px 5px 10px; text-align: center; }
+.rn-footer .rn-brand { justify-content: center; }
+.rn-footer p { font-size: 12px; }
+.rn-footer > a {
+  margin-top: 5px;
+  color: var(--rn-cyan);
+  background: transparent;
+  padding: 8px;
+}
+#rn-revenue, #rn-auth {
+  width: min(100% - 34px, 726px) !important;
+  max-width: 726px !important;
+  margin: 28px auto !important;
+  padding: 21px 17px !important;
+  border: 1px solid var(--rn-line);
+  border-radius: 22px;
+  background: linear-gradient(150deg, #0a2035, #071526);
+  color: var(--rn-text);
+}
+#rn-revenue .rn-intro { text-align: right; }
+#rn-revenue .rn-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+#rn-revenue .rn-card { border-color: var(--rn-line); background: var(--rn-panel); }
+#rn-revenue .rn-note { background: #0b2b40; line-height: 1.9; }
+#rn-auth { text-align: right !important; }
+#rn-auth h2 { color: var(--rn-text); }
+#rn-auth input {
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0;
+  border: 1px solid var(--rn-line) !important;
+  border-radius: 12px !important;
+  color: var(--rn-text);
+  background: #041426;
+  font: inherit;
+}
+#rn-auth button {
+  padding: 12px 17px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--rn-cyan);
+  color: #03202b;
+  font: inherit;
+  font-weight: 800;
+}
+#rn-auth p { overflow-wrap: anywhere; }
+#roarnet-adsterra-banner { margin: 22px auto !important; }
+.rn-bottom-nav {
+  position: fixed;
+  z-index: 9999;
+  right: 50%;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  transform: translateX(50%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(calc(100% - 24px), 540px);
+  padding: 8px 5px;
+  border: 1px solid #175269;
+  border-radius: 19px;
+  background: #061526f5;
+  box-shadow: 0 8px 35px #0008;
+  backdrop-filter: blur(15px);
+}
+.rn-bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 2px;
+  border-radius: 12px;
+  color: var(--rn-muted);
+  background: transparent;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 650;
+}
+.rn-bottom-nav a span { font-size: 20px; }
+.rn-bottom-nav a.active { color: var(--rn-cyan); background: #0c3448; }
+@media (max-width: 390px) {
+  .rn-shell { padding-right: 13px !important; padding-left: 13px !important; }
+  .rn-hero { padding: 21px 17px; }
+  .rn-orbit { left: 12px; width: 60px; height: 60px; font-size: 38px; }
+  .rn-card { padding: 15px 12px; }
+  .rn-bottom-nav { width: calc(100% - 16px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+</style>
+
 </head>
 <body>
-  <main>
-    <div class="lion">🦁</div>
-    <h1>RoarNet</h1>
-    <p><strong>نحو حلول أفضل لمشاركة موارد الإنترنت.</strong></p>
-    <p>
-      RoarNet مشروع قيد التطوير لبناء منصة لإدارة مشاركة موارد الإنترنت
-      وقياس الترافيك، مع العمل على تطوير نظام واضح لحساب الحصص
-      وحقوق المشاركين.
-    </p>
-    <p>سيتم الإعلان عن الخدمات المتاحة بعد استكمال التطوير والتحقق من تكاملات المزوّدين.</p>
+
+<main id="rn-home" class="rn-shell">
+  <header class="rn-topbar">
+    <a class="rn-brand" href="#rn-home" aria-label="RoarNet الرئيسية">
+      <span class="rn-lion">🦁</span>
+      <span>Roar<span class="rn-accent">Net</span></span>
+    </a>
+    <a class="rn-avatar" href="#rn-auth" aria-label="الحساب">♙</a>
+  </header>
+
+  <section class="rn-welcome">
+    <span class="rn-eyebrow">CONNECT · EARN · GROW</span>
+    <h1>أهلاً بك في <span class="rn-accent">RoarNet</span></h1>
+    <p>منصتك لمتابعة مشاركة الإنترنت وتطوير شبكة أكثر ترابطاً.</p>
+  </section>
+
+  <section class="rn-hero">
+    <div class="rn-hero-glow"></div>
+    <span class="rn-pill">🦁 شبكة RoarNet</span>
+    <h2>كل اتصال يبدأ بخطوة</h2>
+    <p>تابع حسابك، تعرّف على خدمات الشبكة، واستكشف التطورات القادمة.</p>
+    <a class="rn-primary" href="#rn-auth">ابدأ من حسابك <span>←</span></a>
+    <div class="rn-orbit" aria-hidden="true">R</div>
+  </section>
+
+  <section id="rn-traffic" class="rn-section">
+    <div class="rn-section-heading">
+      <div><span class="rn-eyebrow">NETWORK</span><h2>مركز الشبكة</h2></div>
+      <span class="rn-live-dot">● قيد التطوير</span>
+    </div>
+    <div class="rn-cards">
+      <article class="rn-card">
+        <span class="rn-card-icon">⌁</span>
+        <h3>مشاركة الإنترنت</h3>
+        <p>إدارة المشاركة تخضع لتوفر خدمة الربط الفعلية وموافقة المستخدم.</p>
+        <span class="rn-card-foot">خدمات الشبكة</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">◉</span>
+        <h3>قياس الترافيك</h3>
+        <p>تُعرض القياسات عند ربط مصدر البيانات والتحقق من أحداث الاستخدام.</p>
+        <span class="rn-card-foot">متابعة الاستخدام</span>
+      </article>
+    </div>
+  </section>
+
+  <section class="rn-section rn-account-card">
+    <span class="rn-card-icon">♙</span>
+    <div>
+      <h2>حسابك في RoarNet</h2>
+      <p>سجّل الدخول بالبريد الإلكتروني للوصول إلى ميزة الحساب الحالية.</p>
+    </div>
+    <a class="rn-secondary" href="#rn-auth">تسجيل الدخول ←</a>
+  </section>
+
+  <footer class="rn-footer">
+    <span class="rn-brand"><span class="rn-lion">🦁</span> Roar<span class="rn-accent">Net</span></span>
+    <p>نبني شبكة أكثر ترابطاً، خطوة بخطوة.</p>
     <a href="https://github.com/ma2871429-cmd/RoarNet"
-       target="_blank" rel="noopener noreferrer">عرض المشروع على GitHub</a>
-    <footer>RoarNet · الموقع الرسمي للمشروع</footer>
-  </main>
+       target="_blank" rel="noopener noreferrer">مشاهدة المشروع على GitHub</a>
+  </footer>
+</main>
+
 
 <!-- ROARNET_REVENUE_HUB_V1 -->
 <style>
@@ -226,6 +504,29 @@ document.getElementById('rn-auth-logout').addEventListener('click', async () => 
 });
 </script>
 <!-- /ROARNET_SUPABASE_LOGIN_V1 -->
+
+
+<nav class="rn-bottom-nav" aria-label="التنقل الرئيسي">
+  <a href="#rn-home" class="active"><span>⌂</span>الرئيسية</a>
+  <a href="#rn-traffic"><span>◉</span>الشبكة</a>
+  <a href="#rn-revenue"><span>↗</span>الإيرادات</a>
+  <a href="#rn-auth"><span>♙</span>حسابي</a>
+</nav>
+<script id="rn-redesign-nav">
+(() => {
+  const links = [...document.querySelectorAll('.rn-bottom-nav a')];
+  const update = () => {
+    const hash = location.hash || '#rn-home';
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === hash));
+  };
+  links.forEach(a => a.addEventListener('click', () => {
+    links.forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+  }));
+  window.addEventListener('hashchange', update);
+  update();
+})();
+</script>
 
 </body>
 </html>
