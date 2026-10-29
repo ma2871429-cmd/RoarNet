@@ -46,9 +46,11 @@ public class MainActivity extends Activity {
                 }
 
                 File script = new File(root, "server.mjs");
-                if (!script.exists()) {
-                    copyAsset("roarnet-server/server.mjs", script);
-                }
+                copyAsset("roarnet-server/server.mjs", script);
+                copyAssetDirectory(
+                    "roarnet-server/public",
+                    new File(root, "public")
+                );
 
                 File database = new File(root, "roarnet.sqlite");
                 SharedPreferences prefs =
@@ -119,6 +121,27 @@ public class MainActivity extends Activity {
             while ((count = in.read(buffer)) != -1) {
                 out.write(buffer, 0, count);
             }
+        }
+    }
+
+
+    private void copyAssetDirectory(String assetDir, File destination)
+            throws IOException {
+        String[] entries = getAssets().list(assetDir);
+        if (entries == null || entries.length == 0) {
+            copyAsset(assetDir, destination);
+            return;
+        }
+
+        if (!destination.exists() && !destination.mkdirs()) {
+            throw new IOException("تعذر إنشاء المجلد: " + destination);
+        }
+
+        for (String entry : entries) {
+            copyAssetDirectory(
+                assetDir + "/" + entry,
+                new File(destination, entry)
+            );
         }
     }
 
