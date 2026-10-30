@@ -90,6 +90,39 @@ db.exec(`
   );
 `);
 
+
+// ROARNET_PROVIDER_SETTLEMENT_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS provider_revenue_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT NOT NULL UNIQUE,
+    month_key TEXT NOT NULL UNIQUE,
+    provider_bytes INTEGER NOT NULL CHECK(provider_bytes > 0),
+    net_cents INTEGER NOT NULL CHECK(net_cents > 0),
+    owner_cents INTEGER NOT NULL CHECK(owner_cents >= 0),
+    participant_cents INTEGER NOT NULL CHECK(participant_cents >= 0),
+    reserve_cents INTEGER NOT NULL CHECK(reserve_cents >= 0),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS provider_revenue_settlements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER NOT NULL REFERENCES provider_revenue_batches(id),
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    traffic_bytes INTEGER NOT NULL CHECK(traffic_bytes > 0),
+    amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+    wallet_reference TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE(batch_id, node_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_provider_batches_month
+    ON provider_revenue_batches(month_key);
+
+  CREATE INDEX IF NOT EXISTS idx_provider_settlements_node
+    ON provider_revenue_settlements(node_id, batch_id);
+`);
+
 // ROARNET_PARTICIPANT_IDENTITY_V1
 db.exec(`
   CREATE TABLE IF NOT EXISTS participant_accounts (
@@ -1329,7 +1362,192 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, id: statusMatch[1], status });
     }
 
+
+    // ROARNET_PROVIDER_SETTLEMENT_V1
+    if (req.method === 'GET' && url.pathname === '/api/admin/provider-revenue-batches') {
+      const batches = db.prepare(`
+        SELECT id,reference,month_key,provider_bytes,net_cents,
+               owner_cents,participant_cents,reserve_cents,created_at
+        FROM provider_revenue_batches
+        ORDER BY month_key DESC
+        LIMIT 100
+      `).all();
+
+      return json(res, 200, {
+        batches: batches.map(b => ({
+          id: Number(b.id),
+          reference: b.reference,
+          month: b.month_key,
+          providerBytes: Number(b.provider_bytes),
+          netUsd: (Number(b.net_cents) / 100).toFixed(2),
+          ownerShareUsd: (Number(b.owner_cents) / 100).toFixed(2),
+          participantPoolUsd: (Number(b.participant_cents) / 100).toFixed(2),
+          operatingReserveUsd: (Number(b.reserve_cents) / 100).toFixed(2),
+          createdAt: b.created_at
+        }))
+      });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/admin/provider-revenue-batches') {
+      const b = await body(req);
+      const reference = String(b.reference || '').trim();
+      const monthKey = String(b.month || '').trim();
+      const providerBytes = Number(b.providerBytes);
+      const netUsd = Number(b.netUsd);
+
+      if (!/^[A-Za-z0-9_.:-]{8,120}$/.test(reference) ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey) ||
+          !Number.isSafeInteger(providerBytes) || providerBytes <= 0 ||
+          !Number.isFinite(netUsd) || netUsd <= 0 || netUsd > 1000000) {
+        return json(res, 400, {
+          error: 'Provide reference, month (YYYY-MM), positive providerBytes and netUsd'
+        });
+      }
+
+      const netCents = Math.round(netUsd * 100);
+      if (!Number.isSafeInteger(netCents) || netCents < 1) {
+        return json(res, 400, { error: 'Invalid netUsd precision' });
+      }
+
+      const trafficRows = db.prepare(`
+        SELECT node_id, SUM(bytes) AS bytes
+        FROM traffic_events
+        WHERE month_key=?
+        GROUP BY node_id
+        ORDER BY node_id
+      `).all(monthKey).map(row => ({
+        nodeId: row.node_id,
+        bytes: Number(row.bytes)
+      }));
+
+      const totalBytes = trafficRows.reduce((sum, row) => {
+        if (!Number.isSafeInteger(row.bytes) || row.bytes <= 0 ||
+            !Number.isSafeInteger(sum + row.bytes)) {
+          throw new Error('Traffic byte total exceeds safe integer range');
+        }
+        return sum + row.bytes;
+      }, 0);
+
+      if (totalBytes === 0) {
+        return json(res, 409, { error: 'No recorded relay traffic for this month' });
+      }
+
+      if (totalBytes !== providerBytes) {
+        return json(res, 409, {
+          error: 'Provider traffic does not match RoarNet traffic',
+          providerBytes,
+          recordedBytes: totalBytes,
+          month: monthKey
+        });
+      }
+
+      // Calculate the 80/15/5 split in integer cents.
+      const net = BigInt(netCents);
+      const ownerCents = Number(net * 80n / 100n);
+      const participantCents = Number(net * 15n / 100n);
+      const reserveCents = netCents - ownerCents - participantCents;
+
+      // Proportional allocation with largest-remainder cent distribution.
+      const total = BigInt(totalBytes);
+      const pool = BigInt(participantCents);
+      const allocations = trafficRows.map(row => {
+        const product = pool * BigInt(row.bytes);
+        return {
+          ...row,
+          amountCents: Number(product / total),
+          remainder: product % total
+        };
+      });
+
+      let remainderCents = participantCents -
+        allocations.reduce((sum, row) => sum + row.amountCents, 0);
+
+      const ranked = [...allocations].sort((a, b) =>
+        a.remainder === b.remainder
+          ? a.nodeId.localeCompare(b.nodeId)
+          : (a.remainder > b.remainder ? -1 : 1)
+      );
+
+      for (let i = 0; i < remainderCents; i++) {
+        ranked[i].amountCents++;
+      }
+
+      const createdAt = now();
+      let batchId;
+
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        const inserted = db.prepare(`
+          INSERT INTO provider_revenue_batches
+            (reference,month_key,provider_bytes,net_cents,
+             owner_cents,participant_cents,reserve_cents,created_at)
+          VALUES(?,?,?,?,?,?,?,?)
+        `).run(
+          reference, monthKey, providerBytes, netCents,
+          ownerCents, participantCents, reserveCents, createdAt
+        );
+
+        batchId = Number(inserted.lastInsertRowid);
+
+        const addSettlement = db.prepare(`
+          INSERT INTO provider_revenue_settlements
+            (batch_id,node_id,traffic_bytes,amount_cents,wallet_reference,created_at)
+          VALUES(?,?,?,?,?,?)
+        `);
+
+        const addWalletEntry = db.prepare(`
+          INSERT INTO participant_wallet_entries
+            (node_id,amount_cents,kind,reference,description,created_at)
+          VALUES(?,?,'earning',?,?,?)
+        `);
+
+        for (const row of allocations) {
+          if (row.amountCents <= 0) continue;
+
+          const walletReference = `provider-batch-${batchId}-${row.nodeId}`;
+          const description = `Provider confirmed traffic revenue for ${monthKey}`;
+
+          addSettlement.run(
+            batchId, row.nodeId, row.bytes,
+            row.amountCents, walletReference, createdAt
+          );
+
+          addWalletEntry.run(
+            row.nodeId, row.amountCents,
+            walletReference, description, createdAt
+          );
+        }
+
+        db.exec('COMMIT');
+      } catch (error) {
+        try { db.exec('ROLLBACK'); } catch {}
+
+        if (String(error.message).includes('UNIQUE')) {
+          return json(res, 409, {
+            error: 'Duplicate provider reference or month already settled'
+          });
+        }
+        throw error;
+      }
+
+      return json(res, 201, {
+        ok: true,
+        batchId,
+        reference,
+        month: monthKey,
+        matchedTrafficBytes: totalBytes,
+        netUsd: (netCents / 100).toFixed(2),
+        ownerShareUsd: (ownerCents / 100).toFixed(2),
+        participantPoolUsd: (participantCents / 100).toFixed(2),
+        operatingReserveUsd: (reserveCents / 100).toFixed(2),
+        participantNodesCredited: allocations.filter(x => x.amountCents > 0).length,
+        note: 'Recorded traffic volume was matched to the supplied provider report. Provider report authenticity must be verified by the administrator.'
+      });
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/admin/summary') {
+      if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
       const usage = db.prepare(
         'SELECT COALESCE(SUM(bytes),0) AS bytes, COUNT(*) AS events FROM usage_events'
       ).get();
@@ -1359,6 +1577,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/admin/net-revenue') {
+      if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
       const b = await body(req);
       const reference = String(b.reference || '');
       const amount = Number(b.netUsd);

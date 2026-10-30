@@ -871,5 +871,239 @@ if (initialSession?.user) {
 })();
 </script>
 
+
+<!-- ROARNET_ADMIN_FINANCE_DASHBOARD_V1 -->
+<section id="rn-admin-finance" hidden dir="rtl"
+  style="margin:20px auto;padding:18px;max-width:900px;
+  border:1px solid #555;border-radius:16px;background:#151923;color:#fff">
+
+  <h2>لوحة الإدارة المالية</h2>
+  <p style="color:#aaa">إيرادات المزوّد وتسويات المشاركين</p>
+
+  <div id="rn-finance-status" role="status"
+    style="padding:10px;border-radius:8px;background:#252d3b">
+    جاري تحميل البيانات...
+  </div>
+
+  <div id="rn-finance-summary"
+    style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;margin:16px 0"></div>
+
+  <h3>تسجيل تقرير إيراد شهري</h3>
+  <p style="color:#e5bd70;font-size:13px">
+    أدخل بيانات تقرير المزوّد الفعلي بعد التحقق منه.
+    التسجيل ينشئ تسوية مالية ويحتاج تأكيداً من نافذة Android.
+  </p>
+
+  <form id="rn-finance-form" style="display:grid;gap:10px">
+    <label>مرجع تقرير المزوّد
+      <input id="rn-fin-ref" required minlength="8" maxlength="120"
+        pattern="[A-Za-z0-9_.:-]{8,120}"
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>الشهر
+      <input id="rn-fin-month" type="month" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>الترافيك بالبايت
+      <input id="rn-fin-bytes" type="number" min="1" step="1" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>صافي الإيراد بالدولار
+      <input id="rn-fin-usd" type="number" min="0.01" max="1000000"
+        step="0.01" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <button type="submit" style="padding:13px;border:0;border-radius:9px;
+      background:#2878d0;color:white;font-weight:bold">
+      مراجعة وتسجيل التسوية
+    </button>
+  </form>
+
+  <h3 style="margin-top:25px">دفعات المزوّد السابقة</h3>
+  <div id="rn-finance-batches">لم يتم تحميل الدفعات.</div>
+
+  <p style="font-size:12px;color:#aaa;margin-top:18px">
+    التوزيع: المالك 80%، المشاركون 15%، احتياطي التشغيل 5%.
+    هذه النسب تطبق على صافي إيرادات المزوّد المسجلة.
+    إيرادات المبيعات منفصلة عن هذه التسويات.
+  </p>
+
+  <button id="rn-finance-refresh" type="button"
+    style="padding:10px 16px;border-radius:8px">
+    تحديث البيانات
+  </button>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  const panel = document.getElementById("rn-admin-finance");
+  const status = document.getElementById("rn-finance-status");
+  const summary = document.getElementById("rn-finance-summary");
+  const batches = document.getElementById("rn-finance-batches");
+  const form = document.getElementById("rn-finance-form");
+
+  if (!panel || !window.RoarNetAdmin) return;
+
+  panel.hidden = false;
+
+  function showStatus(message, error) {
+    status.textContent = message;
+    status.style.border = error ? "1px solid #d65b5b" : "1px solid #477d61";
+  }
+
+  function money(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? "$" + n.toFixed(2) : "$0.00";
+  }
+
+  function card(label, value) {
+    const el = document.createElement("div");
+    el.style.cssText =
+      "padding:14px;background:#252d3b;border-radius:10px;min-width:0";
+
+    const title = document.createElement("div");
+    title.textContent = label;
+    title.style.cssText = "font-size:12px;color:#bbb";
+
+    const amount = document.createElement("strong");
+    amount.textContent = value;
+    amount.style.cssText = "display:block;margin-top:8px;font-size:19px";
+
+    el.append(title, amount);
+    return el;
+  }
+
+  function parseResponse(raw) {
+    const result = JSON.parse(raw);
+    if (!result || result.error) {
+      throw new Error(result && result.error
+        ? result.error : "استجابة الخادم غير صالحة");
+    }
+    return result;
+  }
+
+  function renderBatches(items) {
+    batches.replaceChildren();
+
+    if (!items.length) {
+      batches.textContent = "لا توجد دفعات مسجلة حتى الآن.";
+      return;
+    }
+
+    items.forEach(function (item) {
+      const box = document.createElement("article");
+      box.style.cssText =
+        "padding:13px;margin:10px 0;background:#252d3b;border-radius:10px";
+
+      const title = document.createElement("strong");
+      title.textContent = item.month + " — " + item.reference;
+
+      const details = document.createElement("p");
+      details.textContent =
+        "الترافيك: " + Number(item.providerBytes).toLocaleString() +
+        " بايت | صافي الإيراد: " + money(item.netUsd);
+
+      const split = document.createElement("p");
+      split.textContent =
+        "المالك: " + money(item.ownerShareUsd) +
+        " | المشاركون: " + money(item.participantPoolUsd) +
+        " | الاحتياطي: " + money(item.operatingReserveUsd);
+
+      box.append(title, details, split);
+      batches.appendChild(box);
+    });
+  }
+
+  function refresh() {
+    if (!window.RoarNetAdmin) {
+      showStatus("الجسر المالي غير متاح في هذه البيئة.", true);
+      return;
+    }
+
+    try {
+      showStatus("جاري جلب التسويات...", false);
+
+      const result = parseResponse(
+        window.RoarNetAdmin.getProviderRevenueBatches()
+      );
+
+      const items = Array.isArray(result.batches) ? result.batches : [];
+      renderBatches(items);
+
+      const totals = items.reduce(function (acc, item) {
+        acc.net += Number(item.netUsd) || 0;
+        acc.owner += Number(item.ownerShareUsd) || 0;
+        acc.participants += Number(item.participantPoolUsd) || 0;
+        acc.reserve += Number(item.operatingReserveUsd) || 0;
+        return acc;
+      }, {net:0, owner:0, participants:0, reserve:0});
+
+      summary.replaceChildren(
+        card("إجمالي صافي الدفعات", money(totals.net)),
+        card("حصة المالك", money(totals.owner)),
+        card("حصة المشاركين", money(totals.participants)),
+        card("احتياطي التشغيل", money(totals.reserve))
+      );
+
+      showStatus("تم تحميل " + items.length + " دفعة.", false);
+    } catch (error) {
+      showStatus(error.message || "تعذر تحميل البيانات.", true);
+    }
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const payload = {
+      reference: document.getElementById("rn-fin-ref").value.trim(),
+      month: document.getElementById("rn-fin-month").value,
+      providerBytes: Number(document.getElementById("rn-fin-bytes").value),
+      netUsd: Number(document.getElementById("rn-fin-usd").value)
+    };
+
+    if (!Number.isSafeInteger(payload.providerBytes) ||
+        payload.providerBytes <= 0 ||
+        !Number.isFinite(payload.netUsd) ||
+        payload.netUsd <= 0) {
+      showStatus("تحقق من قيم الترافيك والإيراد.", true);
+      return;
+    }
+
+    try {
+      showStatus("بانتظار تأكيد تسجيل التسوية...", false);
+
+      const result = parseResponse(
+        window.RoarNetAdmin.createProviderRevenueBatch(
+          JSON.stringify(payload)
+        )
+      );
+
+      showStatus(
+        "تم تسجيل التسوية. رقم الدفعة: " + result.batchId,
+        false
+      );
+
+      form.reset();
+      refresh();
+    } catch (error) {
+      showStatus(error.message || "تعذر تسجيل التسوية.", true);
+    }
+  });
+
+  document.getElementById("rn-finance-refresh")
+    .addEventListener("click", refresh);
+
+  refresh();
+})();
+</script>
+<!-- /ROARNET_ADMIN_FINANCE_DASHBOARD_V1 -->
+
 </body>
 </html>
