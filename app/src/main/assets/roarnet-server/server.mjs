@@ -90,6 +90,55 @@ db.exec(`
   );
 `);
 
+// ROARNET_PARTICIPANT_IDENTITY_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS participant_accounts (
+    supabase_user_id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL UNIQUE REFERENCES nodes(id),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS participant_link_codes (
+    code_hash TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_participant_link_codes_node
+    ON participant_link_codes(node_id, expires_at);
+
+  CREATE TABLE IF NOT EXISTS participant_wallet_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    amount_cents INTEGER NOT NULL CHECK(amount_cents != 0),
+    kind TEXT NOT NULL CHECK(kind IN ('earning','adjustment','withdrawal_paid')),
+    reference TEXT NOT NULL UNIQUE,
+    description TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS participant_withdrawals (
+    id TEXT PRIMARY KEY,
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    amount_cents INTEGER NOT NULL CHECK(amount_cents > 0),
+    currency TEXT NOT NULL DEFAULT 'USDT',
+    network TEXT NOT NULL,
+    wallet_address TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','paid')),
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT,
+    txid TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_participant_wallet_node
+    ON participant_wallet_entries(node_id, id DESC);
+  CREATE INDEX IF NOT EXISTS idx_participant_withdrawals_node
+    ON participant_withdrawals(node_id, created_at DESC);
+`);
+
+
 // ROARNET_ULTIMATE_PLAN_V1
 const nodeColumns = db.prepare("PRAGMA table_info(nodes)").all();
 if (!nodeColumns.some(column => column.name === 'plan')) {
@@ -208,6 +257,32 @@ function isAdmin(req) {
   const b = Buffer.from(hash(ADMIN));
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+// Verify the Supabase access token with Supabase Auth.
+// The user ID is taken only from the verified response.
+async function supabaseUser(req) {
+  const match = (req.headers.authorization || '').match(
+    /^Bearer ([A-Za-z0-9._~-]+)$/
+  );
+  const accessToken = match ? match[1] : '';
+  if (!accessToken) return null;
+
+  const response = await fetch(
+    'https://bsmumxfajnzhziezxfth.supabase.co/auth/v1/user',
+    {
+      headers: {
+        apikey: 'sb_publishable_gwrF_3Sk1dRDN7HoMXpTFw_4qctnZob',
+        Authorization: `Bearer ${accessToken}`
+      },
+      signal: AbortSignal.timeout(10000)
+    }
+  );
+
+  if (!response.ok) return null;
+  const user = await response.json();
+  return user && typeof user.id === 'string' ? user : null;
+}
+
 
 function nodeFor(req) {
   const supplied = bearer(req);
@@ -397,6 +472,180 @@ const server = http.createServer(async (req, res) => {
       return json(res, 201, {
         id, label, token,
         warning: 'Save this token securely. It is shown only once. No proxy traffic is served by this core.'
+      });
+    }
+
+
+    // ROARNET_PARTICIPANT_LINK_CODE_V1
+    const linkCodeMatch = url.pathname.match(
+      /^\/api\/admin\/nodes\/([0-9a-f-]{36})\/link-code$/
+    );
+    if (req.method === 'POST' && linkCodeMatch) {
+      if (!isAdmin(req)) return json(res, 401, { error: 'Unauthorized' });
+
+      const nodeId = linkCodeMatch[1];
+      const node = db.prepare(
+        "SELECT id FROM nodes WHERE id=? AND status='active'"
+      ).get(nodeId);
+      if (!node) return json(res, 404, { error: 'Active node not found' });
+
+      const code = crypto.randomBytes(18).toString('hex');
+      const createdAt = now();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      db.prepare(`
+        INSERT INTO participant_link_codes
+          (code_hash,node_id,expires_at,created_at)
+        VALUES (?,?,?,?)
+      `).run(hash(code), nodeId, expiresAt, createdAt);
+
+      return json(res, 201, {
+        ok: true,
+        nodeId,
+        code,
+        expiresAt,
+        warning: 'This code is shown once and expires in 15 minutes.'
+      });
+    }
+
+    // ROARNET_PARTICIPANT_LINK_V1
+    if (req.method === 'POST' && url.pathname === '/api/participant/link') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const b = await body(req);
+      const code = String(b.code || '').trim();
+      if (!/^[a-f0-9]{36}$/.test(code)) {
+        return json(res, 400, { error: 'Invalid link code' });
+      }
+
+      const existing = db.prepare(
+        'SELECT node_id FROM participant_accounts WHERE supabase_user_id=?'
+      ).get(user.id);
+      if (existing) {
+        return json(res, 409, { error: 'This account is already linked', nodeId: existing.node_id });
+      }
+
+      try {
+        db.exec('BEGIN IMMEDIATE');
+        const link = db.prepare(`
+          SELECT c.node_id
+          FROM participant_link_codes c
+          JOIN nodes n ON n.id=c.node_id
+          WHERE c.code_hash=? AND c.used_at IS NULL
+            AND c.expires_at>? AND n.status='active'
+        `).get(hash(code), now());
+
+        if (!link) {
+          db.exec('ROLLBACK');
+          return json(res, 400, { error: 'Link code expired, used, or invalid' });
+        }
+
+        const nodeAlreadyLinked = db.prepare(
+          'SELECT supabase_user_id FROM participant_accounts WHERE node_id=?'
+        ).get(link.node_id);
+
+        if (nodeAlreadyLinked) {
+          db.exec('ROLLBACK');
+          return json(res, 409, { error: 'This node is already linked to an account' });
+        }
+
+        db.prepare(`
+          INSERT INTO participant_accounts(supabase_user_id,node_id,created_at)
+          VALUES(?,?,?)
+        `).run(user.id, link.node_id, now());
+
+        const consumed = db.prepare(`
+          UPDATE participant_link_codes SET used_at=?
+          WHERE code_hash=? AND used_at IS NULL AND expires_at>?
+        `).run(now(), hash(code), now());
+
+        if (!consumed.changes) {
+          db.exec('ROLLBACK');
+          return json(res, 409, { error: 'Link code was already used' });
+        }
+
+        db.exec('COMMIT');
+        return json(res, 200, { ok: true, linked: true, nodeId: link.node_id });
+      } catch (error) {
+        try { db.exec('ROLLBACK'); } catch {}
+        if (String(error.message).includes('UNIQUE')) {
+          return json(res, 409, { error: 'Account or node already linked' });
+        }
+        throw error;
+      }
+    }
+
+    // ROARNET_PARTICIPANT_WALLET_V1
+    if (req.method === 'GET' && url.pathname === '/api/participant/wallet') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id, n.label
+        FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 200, {
+        linked: false,
+        currency: 'USDT',
+        network: 'TRC20',
+        minimumPayout: '0.01'
+      });
+
+      const entries = db.prepare(`
+        SELECT kind,amount_cents,reference,description,created_at
+        FROM participant_wallet_entries
+        WHERE node_id=? ORDER BY id DESC LIMIT 50
+      `).all(account.node_id);
+
+      const withdrawals = db.prepare(`
+        SELECT id,amount_cents,currency,network,wallet_address,status,created_at,reviewed_at,txid
+        FROM participant_withdrawals
+        WHERE node_id=? ORDER BY created_at DESC LIMIT 30
+      `).all(account.node_id);
+
+      const earned = Number(db.prepare(`
+        SELECT COALESCE(SUM(amount_cents),0) AS total
+        FROM participant_wallet_entries WHERE node_id=?
+      `).get(account.node_id).total);
+
+      const reserved = Number(db.prepare(`
+        SELECT COALESCE(SUM(amount_cents),0) AS total
+        FROM participant_withdrawals
+        WHERE node_id=? AND status IN ('pending','approved','paid')
+      `).get(account.node_id).total);
+
+      return json(res, 200, {
+        linked: true,
+        nodeId: account.node_id,
+        label: account.label,
+        currency: 'USDT',
+        network: 'TRC20',
+        minimumPayout: '0.01',
+        balanceCents: Math.max(0, earned - reserved),
+        balanceUsdt: (Math.max(0, earned - reserved) / 100).toFixed(2),
+        entries: entries.map(e => ({
+          kind: e.kind,
+          amountUsdt: (Number(e.amount_cents) / 100).toFixed(2),
+          reference: e.reference,
+          description: e.description,
+          createdAt: e.created_at
+        })),
+        withdrawals: withdrawals.map(w => ({
+          id: w.id,
+          amountUsdt: (Number(w.amount_cents) / 100).toFixed(2),
+          currency: w.currency,
+          network: w.network,
+          walletAddress: w.wallet_address,
+          status: w.status,
+          createdAt: w.created_at,
+          reviewedAt: w.reviewed_at,
+          txid: w.txid
+        })),
+        note: 'Only verified participant earnings entered in the wallet are included. Reported traffic is not a confirmed earning.'
       });
     }
 

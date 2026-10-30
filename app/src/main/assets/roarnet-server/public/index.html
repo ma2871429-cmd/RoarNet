@@ -533,6 +533,42 @@ body {
     <button id="rn-auth-logout" type="button">تسجيل الخروج</button>
   </div>
 </section>
+
+<!-- ROARNET_PARTICIPANT_WALLET_UI_V1 -->
+<section id="rn-wallet" hidden style="max-width:520px;margin:20px auto;padding:22px;border:1px solid #176078;border-radius:20px;background:#091d32;color:#effaff;text-align:right">
+  <h2 style="margin-top:0">محفظة المشارك</h2>
+  <p style="color:#9bb7c9">رصيدك من الأرباح المؤكدة — USDT / TRC20</p>
+
+  <div id="rn-wallet-balance" style="padding:20px;border-radius:15px;background:#103b51;text-align:center">
+    <small>الرصيد المتاح</small>
+    <div id="rn-wallet-amount" style="font-size:34px;font-weight:850;color:#13dfd0">0.00 USDT</div>
+  </div>
+
+  <div id="rn-wallet-unlinked" hidden style="margin-top:18px">
+    <p>حسابك مسجل. أدخل رمز الربط الذي يصدره مدير RoarNet لعقدتك.</p>
+    <form id="rn-wallet-link-form">
+      <input id="rn-wallet-code" required minlength="36" maxlength="36" autocomplete="off"
+        placeholder="رمز الربط"
+        style="box-sizing:border-box;width:100%;padding:13px;border-radius:10px;border:1px solid #164b62;background:#04101f;color:#effaff">
+      <button type="submit" style="margin-top:10px;padding:12px 18px;border:0;border-radius:10px;background:#13dfd0;color:#04101f;font-weight:bold">ربط حساب المشارك</button>
+    </form>
+  </div>
+
+  <div id="rn-wallet-linked" hidden>
+    <p id="rn-wallet-node" style="color:#9bb7c9"></p>
+    <h3>آخر الحركات</h3>
+    <div id="rn-wallet-entries"></div>
+    <h3>طلبات السحب</h3>
+    <div id="rn-wallet-withdrawals"></div>
+    <p style="color:#9bb7c9;font-size:12px;line-height:1.8">
+      الحد الأدنى المعتمد 0.01 USDT. عرض الرصيد لا يعني تنفيذ تحويل تلقائي؛ التحويل يتطلب ربط مزود دفع فعلي.
+    </p>
+  </div>
+  <p id="rn-wallet-status" role="status" aria-live="polite" style="color:#13dfd0"></p>
+  <button id="rn-wallet-refresh" type="button" style="padding:9px 14px;border:1px solid #176078;border-radius:9px;background:#0d2940;color:#effaff">تحديث المحفظة</button>
+</section>
+<!-- /ROARNET_PARTICIPANT_WALLET_UI_V1 -->
+
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -540,6 +576,88 @@ const supabase = createClient('https://bsmumxfajnzhziezxfth.supabase.co', 'sb_pu
 const form = document.getElementById('rn-auth-form');
 const statusBox = document.getElementById('rn-auth-status');
 const userBox = document.getElementById('rn-auth-user');
+const wallet = document.getElementById('rn-wallet');
+const walletStatus = document.getElementById('rn-wallet-status');
+
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));
+
+async function walletRequest(path, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('سجّل الدخول أولاً.');
+
+  const response = await fetch(path, {
+    ...options,
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + session.access_token,
+      ...(options.headers || {})
+    }
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'تعذّر تنفيذ الطلب.');
+  return data;
+}
+
+async function loadWallet() {
+  const { data: { session } } = await supabase.auth.getSession();
+  wallet.hidden = !session?.user;
+  if (!session?.user) return;
+
+  walletStatus.textContent = 'جارٍ تحميل المحفظة...';
+
+  try {
+    const data = await walletRequest('/api/participant/wallet');
+    document.getElementById('rn-wallet-unlinked').hidden = Boolean(data.linked);
+    document.getElementById('rn-wallet-linked').hidden = !data.linked;
+    document.getElementById('rn-wallet-amount').textContent =
+      (data.balanceUsdt || '0.00') + ' USDT';
+
+    if (!data.linked) {
+      walletStatus.textContent = 'الحساب ينتظر الربط بعقدة مشارك.';
+      return;
+    }
+
+    document.getElementById('rn-wallet-node').textContent =
+      'العقدة: ' + data.label;
+
+    const entries = document.getElementById('rn-wallet-entries');
+    entries.replaceChildren();
+
+    if (!data.entries?.length) {
+      entries.textContent = 'لا توجد حركات مالية مسجلة حالياً.';
+    } else {
+      for (const item of data.entries) {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:10px;margin:7px 0;border-bottom:1px solid #164b62';
+        row.textContent =
+          `${item.description || item.kind} — ${item.amountUsdt} USDT — ${item.createdAt}`;
+        entries.appendChild(row);
+      }
+    }
+
+    const withdrawals = document.getElementById('rn-wallet-withdrawals');
+    withdrawals.replaceChildren();
+
+    if (!data.withdrawals?.length) {
+      withdrawals.textContent = 'لا توجد طلبات سحب.';
+    } else {
+      for (const item of data.withdrawals) {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:10px;margin:7px 0;border-bottom:1px solid #164b62';
+        row.textContent = `${item.amountUsdt} USDT — ${item.network} — ${item.status}`;
+        withdrawals.appendChild(row);
+      }
+    }
+
+    walletStatus.textContent = 'تم تحديث المحفظة.';
+  } catch (error) {
+    walletStatus.textContent = error.message;
+  }
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -560,13 +678,124 @@ supabase.auth.onAuthStateChange((_event, session) => {
   form.hidden = Boolean(email);
   document.getElementById('rn-auth-email-view').textContent = email || '';
   if (email) statusBox.textContent = 'تم تسجيل الدخول بنجاح.';
+  wallet.hidden = !email;
+  if (email) setTimeout(loadWallet, 0);
+  else walletStatus.textContent = '';
 });
 
 document.getElementById('rn-auth-logout').addEventListener('click', async () => {
   const { error } = await supabase.auth.signOut();
   statusBox.textContent = error ? 'تعذّر تسجيل الخروج.' : 'تم تسجيل الخروج.';
 });
+
+document.getElementById('rn-wallet-link-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  walletStatus.textContent = 'جارٍ ربط الحساب...';
+  const code = document.getElementById('rn-wallet-code').value.trim();
+  try {
+    await walletRequest('/api/participant/link', {
+      method: 'POST',
+      body: JSON.stringify({ code })
+    });
+    document.getElementById('rn-wallet-code').value = '';
+    walletStatus.textContent = 'تم ربط الحساب بنجاح.';
+    await loadWallet();
+  } catch (error) {
+    walletStatus.textContent = error.message;
+  }
+});
+
+document.getElementById('rn-wallet-refresh').addEventListener('click', loadWallet);
+
+const { data: { session: initialSession } } = await supabase.auth.getSession();
+if (initialSession?.user) {
+  userBox.hidden = false;
+  form.hidden = true;
+  document.getElementById('rn-auth-email-view').textContent = initialSession.user.email || '';
+  wallet.hidden = false;
+  await loadWallet();
+}
 </script>
+
+<!-- ROARNET_ADMIN_LINK_CODE_UI_V1 -->
+<section id="rn-admin-link-code" style="max-width:520px;margin:20px auto;padding:20px;border:1px solid #8b6b2d;border-radius:16px;background:#201d16;color:#fff4d6;text-align:right">
+  <h2>إدارة ربط المشاركين</h2>
+  <p>أدخل معرّف العقدة النشطة لإصدار رمز ربط مؤقت.</p>
+  <input id="rn-admin-node-id" type="text" dir="ltr"
+    placeholder="Node UUID"
+    autocomplete="off"
+    style="box-sizing:border-box;width:100%;padding:12px;border-radius:9px;border:1px solid #806b43;background:#100f0c;color:white">
+  <button id="rn-admin-generate-code" type="button"
+    style="margin-top:10px;padding:12px 18px;border:0;border-radius:9px;background:#e8bd62;color:#20170a;font-weight:bold">
+    إصدار رمز الربط
+  </button>
+  <p id="rn-admin-code-status" role="status" aria-live="polite"></p>
+  <div id="rn-admin-code-result" hidden>
+    <p>رمز الربط — صالح لمدة 15 دقيقة:</p>
+    <code id="rn-admin-code-value" dir="ltr" style="display:block;overflow-wrap:anywhere;padding:12px;background:#100f0c;border-radius:8px"></code>
+    <button id="rn-admin-copy-code" type="button">نسخ الرمز</button>
+    <p style="font-size:12px">احفظ الرمز وأرسله للمشارك. يظهر مرة واحدة فقط.</p>
+  </div>
+</section>
+<script>
+(() => {
+  const button = document.getElementById('rn-admin-generate-code');
+  const status = document.getElementById('rn-admin-code-status');
+  const result = document.getElementById('rn-admin-code-result');
+  const codeBox = document.getElementById('rn-admin-code-value');
+
+  button.addEventListener('click', () => {
+    const nodeId = document.getElementById('rn-admin-node-id').value.trim();
+    result.hidden = true;
+    status.textContent = '';
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nodeId)) {
+      status.textContent = 'أدخل معرّف عقدة UUID صالحاً.';
+      return;
+    }
+
+    if (!window.RoarNetAdmin ||
+        typeof window.RoarNetAdmin.generateParticipantLinkCode !== 'function') {
+      status.textContent = 'هذه الميزة متاحة داخل تطبيق RoarNet على أندرويد.';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'بانتظار تأكيد المدير...';
+
+    try {
+      const response = JSON.parse(
+        window.RoarNetAdmin.generateParticipantLinkCode(nodeId)
+      );
+
+      if (!response.code) {
+        status.textContent = response.error || 'تعذر إصدار الرمز.';
+        return;
+      }
+
+      codeBox.textContent = response.code;
+      result.hidden = false;
+      status.textContent = 'تم إصدار الرمز. ينتهي: ' + response.expiresAt;
+    } catch (error) {
+      status.textContent = 'تعذر إصدار الرمز.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.getElementById('rn-admin-copy-code').addEventListener('click', async () => {
+    const code = codeBox.textContent;
+    try {
+      await navigator.clipboard.writeText(code);
+      status.textContent = 'تم نسخ الرمز.';
+    } catch (_) {
+      status.textContent = 'تعذر النسخ تلقائياً؛ انسخ الرمز يدوياً.';
+    }
+  });
+})();
+</script>
+<!-- /ROARNET_ADMIN_LINK_CODE_UI_V1 -->
+
 <!-- /ROARNET_SUPABASE_LOGIN_V1 -->
 
 

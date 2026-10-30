@@ -4,6 +4,14 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
+import android.app.AlertDialog;
+import java.net.HttpURLConnection;
+import java.io.OutputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.webkit.WebSettings;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -14,7 +22,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.SecureRandom;
 
@@ -145,13 +152,138 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    // ROARNET_ANDROID_ADMIN_BRIDGE_V1
+    private final class RoarNetAdminBridge {
+        @JavascriptInterface
+        public String generateParticipantLinkCode(String nodeId) {
+            if (nodeId == null ||
+                !nodeId.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
+                return "{\"error\":\"معرّف العقدة غير صالح.\"}";
+            }
+
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicBoolean approved = new AtomicBoolean(false);
+
+            runOnUiThread(() -> {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("تأكيد إصدار رمز ربط")
+                    .setMessage("هل توافق على إصدار رمز ربط مؤقت لهذه العقدة؟")
+                    .setNegativeButton("إلغاء", (dialog, which) -> {
+                        approved.set(false);
+                        latch.countDown();
+                    })
+                    .setPositiveButton("إصدار الرمز", (dialog, which) -> {
+                        approved.set(true);
+                        latch.countDown();
+                    })
+                    .setOnCancelListener(dialog -> latch.countDown())
+                    .show();
+            });
+
+            try {
+                if (!latch.await(60, TimeUnit.SECONDS) || !approved.get()) {
+                    return "{\"error\":\"ألغيت العملية أو انتهت مهلة التأكيد.\"}";
+                }
+
+                SharedPreferences prefs =
+                    getSharedPreferences("roarnet_local", MODE_PRIVATE);
+                String adminToken = prefs.getString("admin_token", null);
+
+                if (adminToken == null || adminToken.length() < 32) {
+                    return "{\"error\":\"رمز المدير المحلي غير متاح.\"}";
+                }
+
+                URL endpoint = new URL(
+                    LOCAL_URL + "api/admin/nodes/" + nodeId + "/link-code"
+                );
+                HttpURLConnection connection =
+                    (HttpURLConnection) endpoint.openConnection();
+
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(12000);
+                connection.setDoOutput(true);
+                connection.setRequestProperty(
+                    "Authorization", "Bearer " + adminToken
+                );
+                connection.setRequestProperty(
+                    "Content-Type", "application/json"
+                );
+
+                try (OutputStream out = connection.getOutputStream()) {
+                    out.write("{}".getBytes("UTF-8"));
+                }
+
+                int status = connection.getResponseCode();
+                InputStream input = status >= 400
+                    ? connection.getErrorStream()
+                    : connection.getInputStream();
+
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                if (input != null) {
+                    try (InputStream in = input) {
+                        byte[] chunk = new byte[4096];
+                        int count;
+                        while ((count = in.read(chunk)) != -1) {
+                            buffer.write(chunk, 0, count);
+                        }
+                    }
+                }
+
+                connection.disconnect();
+                return new String(buffer.toByteArray(), "UTF-8");
+
+            } catch (Exception e) {
+                return "{\"error\":\"تعذر الاتصال بخادم RoarNet المحلي.\"}";
+            }
+        }
+    }
+    // /ROARNET_ANDROID_ADMIN_BRIDGE_V1
+
     private void openLocalWebView() {
         web = new WebView(this);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        web.setWebViewClient(new WebViewClient());
+        // ROARNET_WEBVIEW_LOCAL_ONLY_V1
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+
+        web.setWebViewClient(new WebViewClient() {
+            private boolean isTrustedLocalUrl(String value) {
+                if (value == null) return false;
+                try {
+                    URL parsed = new URL(value);
+                    return "http".equalsIgnoreCase(parsed.getProtocol())
+                        && "127.0.0.1".equals(parsed.getHost())
+                        && parsed.getPort() == 3180;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view, String url) {
+                return !isTrustedLocalUrl(url);
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view,
+                    android.webkit.WebResourceRequest request) {
+                return !isTrustedLocalUrl(
+                    request.getUrl().toString()
+                );
+            }
+        });
+
+        web.addJavascriptInterface(new RoarNetAdminBridge(), "RoarNetAdmin");
         web.setBackgroundColor(Color.rgb(16, 24, 39));
+        // /ROARNET_WEBVIEW_LOCAL_ONLY_V1
         setContentView(web);
         web.loadUrl(LOCAL_URL);
     }
