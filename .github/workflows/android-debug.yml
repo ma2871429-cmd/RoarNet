@@ -46,9 +46,32 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses
 
-      - name: Install Android SDK 35
+      - name: Install Android SDK 35 and matching NDK
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865"
+
+      - name: Download and stage Node.js Mobile
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/nodejs-mobile-android-26.12.1-0.zip"
+
+          curl --fail --location --show-error --retry 3 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/ma2871429-cmd/RoarNet/releases/assets/696585675" \
+            -o "$ZIP"
+
+          echo "58e0b7d9455b06703d4001eddfe0445f9cd9671b9045b665dce0e725cd7b994e  $ZIP" | sha256sum --check -
+
+          mkdir -p app/libnode
+          unzip -oq "$ZIP" 'bin/arm64-v8a/libnode.so' 'include/node/*' -d app/libnode
+
+          test -s app/libnode/bin/arm64-v8a/libnode.so
+          test -s app/libnode/include/node/node.h
+
+          echo "Node.js Mobile runtime staged successfully."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
