@@ -2,6 +2,8 @@ package com.roarnet.app;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.content.Intent;
+import android.net.Uri;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.JavascriptInterface;
@@ -29,6 +31,7 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final String LOCAL_URL = "http://127.0.0.1:3180/";
     private WebView web;
+    private String pendingAuthCode;
 
     private native int startNode(
         String scriptPath,
@@ -44,6 +47,7 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        captureAuthCode(getIntent());
         showMessage("🦁 RoarNet", "جاري تشغيل خادم RoarNet المحلي...");
 
         new Thread(() -> {
@@ -103,10 +107,24 @@ public class MainActivity extends Activity {
                 }
 
                 if (!ready) {
-                    runOnUiThread(() -> showMessage(
-                        "RoarNet",
-                        "لم يبدأ الخادم المحلي. راجع سجل تشغيل التطبيق."
-                    ));
+                    File nodeLog = new File(database.getAbsolutePath() + ".node.log");
+                    String details = "لم يبدأ الخادم المحلي.";
+                    if (nodeLog.isFile()) {
+                        try (java.io.RandomAccessFile log =
+                                 new java.io.RandomAccessFile(nodeLog, "r")) {
+                            long length = log.length();
+                            long start = Math.max(0, length - 12000);
+                            log.seek(start);
+                            byte[] bytes = new byte[(int)(length - start)];
+                            log.readFully(bytes);
+                            details += "\n\nسجل Node:\n" +
+                                new String(bytes, "UTF-8");
+                        } catch (Exception ignored) {
+                            details += "\nتعذرت قراءة سجل Node.";
+                        }
+                    }
+                    final String errorDetails = details;
+                    runOnUiThread(() -> showMessage("RoarNet - خطأ التشغيل", errorDetails));
                     return;
                 }
 
@@ -359,6 +377,40 @@ public class MainActivity extends Activity {
     }
     // /ROARNET_ANDROID_ADMIN_BRIDGE_V1
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        captureAuthCode(intent);
+    }
+
+    private void captureAuthCode(Intent intent) {
+        if (intent == null || intent.getData() == null) return;
+
+        Uri uri = intent.getData();
+        if (!"roarnet".equals(uri.getScheme())
+                || !"auth-callback".equals(uri.getHost())) return;
+
+        String code = uri.getQueryParameter("code");
+        if (code == null || code.isEmpty()) return;
+
+        pendingAuthCode = code;
+        deliverPendingAuthCode();
+    }
+
+    private void deliverPendingAuthCode() {
+        if (web == null || pendingAuthCode == null) return;
+
+        final String code = pendingAuthCode;
+        pendingAuthCode = null;
+
+        web.post(() -> web.evaluateJavascript(
+            "window.RoarNetHandleAuthCode && window.RoarNetHandleAuthCode("
+                + JSONObject.quote(code) + ");",
+            null
+        ));
+    }
+
     private void openLocalWebView() {
         web = new WebView(this);
         WebSettings settings = web.getSettings();
@@ -381,6 +433,12 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     return false;
                 }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                deliverPendingAuthCode();
             }
 
             @Override

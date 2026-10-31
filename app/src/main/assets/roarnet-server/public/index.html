@@ -275,6 +275,209 @@ body {
 }
 </style>
 
+
+<style id="ROARNET_PREMIUM_UI_V1">
+:root {
+  color-scheme: dark;
+  --rn-bg: #07111f;
+  --rn-panel: #101e31;
+  --rn-panel2: #142840;
+  --rn-cyan: #35d5e8;
+  --rn-blue: #368bff;
+  --rn-text: #f1f7ff;
+  --rn-muted: #91a7bd;
+  --rn-border: rgba(93,190,220,.17);
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--rn-bg);
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% -15%, rgba(35,137,190,.23), transparent 48%),
+    linear-gradient(180deg,#07111f 0%,#091626 55%,#07111f 100%) !important;
+  color: var(--rn-text) !important;
+  font-family: system-ui, "Noto Sans Arabic", sans-serif !important;
+  padding-bottom: 100px !important;
+}
+
+section:not(#rn-traffic),
+#rn-auth,
+#rn-wallet,
+#rn-revenue,
+#rn-admin-link-code,
+#rn-admin-finance {
+  border-color: var(--rn-border) !important;
+  border-radius: 22px !important;
+}
+
+h1,h2,h3,h4 {
+  color: var(--rn-text);
+  letter-spacing: -.35px;
+}
+
+p,small,label {
+  color: var(--rn-muted);
+}
+
+input,select,textarea {
+  box-sizing: border-box !important;
+  max-width: 100%;
+  border: 1px solid var(--rn-border) !important;
+  border-radius: 13px !important;
+  background: #091727 !important;
+  color: var(--rn-text) !important;
+  outline: none;
+}
+
+input:focus,select:focus,textarea:focus {
+  border-color: var(--rn-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(53,213,232,.10);
+}
+
+button {
+  border-radius: 13px !important;
+  cursor: pointer;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+button:active {
+  transform: scale(.97);
+}
+
+a {
+  color: var(--rn-cyan);
+}
+
+.rn-bottom-nav {
+  position: fixed !important;
+  z-index: 9999 !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  left: 12px !important;
+  right: 12px !important;
+  width: auto !important;
+  max-width: 720px;
+  margin: auto !important;
+  padding: 10px 8px !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  gap: 5px !important;
+  border: 1px solid rgba(77,190,220,.22) !important;
+  border-radius: 20px !important;
+  background: rgba(10,25,42,.94) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  backdrop-filter: blur(18px);
+}
+
+.rn-bottom-nav a {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 3px !important;
+  border-radius: 13px !important;
+  color: #91a7bd !important;
+  text-align: center;
+  text-decoration: none !important;
+  font-size: 11px !important;
+}
+
+.rn-bottom-nav a span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+.rn-bottom-nav a.active {
+  color: var(--rn-cyan) !important;
+  background: rgba(53,213,232,.10) !important;
+}
+
+#rn-traffic,
+.rn-bottom-nav a[href="#rn-traffic"] {
+  display: none !important;
+}
+
+#rn-auth,
+#rn-wallet,
+#rn-revenue,
+#rn-admin-link-code,
+#rn-admin-finance {
+  background: linear-gradient(145deg,#12243a,#0c192a) !important;
+  border: 1px solid var(--rn-border) !important;
+  box-shadow: 0 12px 35px rgba(0,0,0,.18);
+}
+
+#rn-wallet-amount {
+  color: var(--rn-cyan);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+#rn-finance-summary > div {
+  border: 1px solid var(--rn-border);
+  border-radius: 16px;
+  background: linear-gradient(145deg,#172d45,#102036) !important;
+}
+
+/* ROARNET_DASHBOARD_V1 */
+#rn-dashboard { margin-top: 28px; }
+.rn-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.rn-dashboard-card {
+  position: relative;
+  display: flex;
+  min-height: 145px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--rn-border);
+  border-radius: 19px;
+  color: var(--rn-text) !important;
+  background: linear-gradient(145deg,#142b43,#0b1b2d);
+  text-decoration: none !important;
+  transition: transform .18s ease, border-color .18s ease;
+}
+.rn-dashboard-card:active { transform: scale(.98); }
+.rn-dashboard-wallet {
+  border-color: rgba(53,213,232,.42);
+  background: linear-gradient(145deg,#104052,#0b2237);
+}
+.rn-dashboard-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--rn-cyan);
+  background: rgba(53,213,232,.12);
+  font-size: 22px;
+}
+.rn-dashboard-label { color: var(--rn-cyan); font-size: 11px; }
+.rn-dashboard-card strong { font-size: 15px; }
+.rn-dashboard-card small { color: var(--rn-muted); font-size: 11px; line-height: 1.7; }
+.rn-dashboard-arrow { position: absolute; left: 15px; bottom: 13px; color: var(--rn-cyan); }
+.rn-dashboard-info { background: linear-gradient(145deg,#17263b,#101a2a); }
+#rn-public-stats { display: none !important; }
+@media (max-width: 360px) {
+  .rn-dashboard-grid { gap: 8px; }
+  .rn-dashboard-card { padding: 12px; }
+}
+/* END ROARNET_DASHBOARD_V1 */
+
+
+@media (max-width: 480px) {
+  body { padding-left: 12px; padding-right: 12px; }
+  #rn-admin-finance { padding: 14px !important; }
+  .rn-bottom-nav { left: 8px !important; right: 8px !important; }
+}
+</style>
+
 </head>
 <body>
 
@@ -300,6 +503,49 @@ body {
     <p>تابع حسابك، تعرّف على خدمات الشبكة، واستكشف التطورات القادمة.</p>
     <a class="rn-primary" href="#rn-auth">ابدأ من حسابك <span>←</span></a>
     <div class="rn-orbit" aria-hidden="true">R</div>
+  </section>
+
+  <section id="rn-dashboard" class="rn-section">
+    <div class="rn-section-heading">
+      <div>
+        <span class="rn-eyebrow">YOUR ROARNET SPACE</span>
+        <h2>لوحة التحكم</h2>
+      </div>
+      <span class="rn-live-dot">حسابك</span>
+    </div>
+
+    <div class="rn-dashboard-grid">
+      <a class="rn-dashboard-card rn-dashboard-wallet" href="#rn-wallet">
+        <span class="rn-dashboard-icon">◈</span>
+        <span class="rn-dashboard-label">المحفظة</span>
+        <strong>إدارة رصيدك</strong>
+        <small>الحركات المالية وطلبات السحب</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <a class="rn-dashboard-card" href="#rn-revenue">
+        <span class="rn-dashboard-icon">↗</span>
+        <span class="rn-dashboard-label">الإيرادات</span>
+        <strong>مصادر الدخل</strong>
+        <small>تفاصيل الإيرادات وآلية التوزيع</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <a class="rn-dashboard-card" href="#rn-auth">
+        <span class="rn-dashboard-icon">♙</span>
+        <span class="rn-dashboard-label">حسابي</span>
+        <strong>إدارة الحساب</strong>
+        <small>تسجيل الدخول ومعلومات الحساب</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <div class="rn-dashboard-card rn-dashboard-info">
+        <span class="rn-dashboard-icon">🦁</span>
+        <span class="rn-dashboard-label">RoarNet</span>
+        <strong>مساحة نمو مشتركة</strong>
+        <small>تطوير الخدمات والميزات القادمة</small>
+      </div>
+    </div>
   </section>
 
   <section id="rn-traffic" class="rn-section">
@@ -569,10 +815,53 @@ body {
 </section>
 <!-- /ROARNET_PARTICIPANT_WALLET_UI_V1 -->
 
+<section id="rn-consent" hidden style="max-width:520px;margin:18px auto;padding:20px;border:1px solid #13a6a0;border-radius:16px;background:#10283a;color:#effaff;text-align:right">
+  <h3>موافقة مشاركة الإنترنت</h3>
+  <p>تتيح RoarNet مشاركة اتصال الإنترنت من عقدتك عبر مزودي الترافيك المعتمدين.</p>
+  <ul style="line-height:1.9">
+    <li>قد يُستخدم عنوان IP الخاص باتصالك ضمن حركة الترافيك التي يمررها المزود.</li>
+    <li>يعتمد احتساب الأرباح على الترافيك الذي يؤكده المزود فعلياً.</li>
+    <li>تختلف فرص الاستخدام والأرباح بحسب الطلب وتوفر الاتصال وشروط المزود.</li>
+    <li>قد يستهلك النشاط بيانات الإنترنت من باقتك.</li>
+    <li>يمكنك إيقاف المشاركة وسحب موافقتك من هذه الواجهة.</li>
+  </ul>
+  <p id="rn-consent-state" role="status" aria-live="polite"></p>
+  <button id="rn-consent-accept" type="button">أوافق على المشاركة</button>
+  <button id="rn-consent-revoke" type="button">إيقاف المشاركة وسحب الموافقة</button>
+</section>
+
+
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const supabase = createClient('https://bsmumxfajnzhziezxfth.supabase.co', 'sb_publishable_gwrF_3Sk1dRDN7HoMXpTFw_4qctnZob');
+const supabase = createClient(
+  'https://bsmumxfajnzhziezxfth.supabase.co',
+  'sb_publishable_gwrF_3Sk1dRDN7HoMXpTFw_4qctnZob',
+  {
+    auth: {
+      flowType: 'pkce',
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+window.RoarNetHandleAuthCode = async function(code) {
+  const status = document.getElementById('rn-auth-status');
+  status.textContent = 'جارٍ إكمال تسجيل الدخول داخل التطبيق...';
+
+  try {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    if (!data.session) throw new Error('لم يتم إنشاء جلسة الدخول.');
+
+    status.textContent = 'تم تسجيل الدخول بنجاح.';
+    await loadWallet();
+  } catch (error) {
+    status.textContent = 'تعذّر إكمال تسجيل الدخول: ' + error.message;
+  }
+};
 const form = document.getElementById('rn-auth-form');
 const statusBox = document.getElementById('rn-auth-status');
 const userBox = document.getElementById('rn-auth-user');
@@ -602,12 +891,32 @@ async function walletRequest(path, options = {}) {
   return data;
 }
 
+
+async function loadConsent() {
+  const panel = document.getElementById('rn-consent');
+  const state = document.getElementById('rn-consent-state');
+  try {
+    const data = await walletRequest('/api/participant/consent');
+    panel.hidden = !data.linked;
+    if (!data.linked) return;
+    state.textContent = data.accepted
+      ? 'الموافقة فعالة منذ: ' + data.acceptedAt
+      : 'الموافقة غير مفعلة. يلزم قبول المشاركة قبل تسجيل الاستخدام.';
+    document.getElementById('rn-consent-accept').hidden = data.accepted;
+    document.getElementById('rn-consent-revoke').hidden = !data.accepted;
+  } catch (error) {
+    panel.hidden = false;
+    state.textContent = error.message;
+  }
+}
+
 async function loadWallet() {
   const { data: { session } } = await supabase.auth.getSession();
   wallet.hidden = !session?.user;
   if (!session?.user) return;
 
   walletStatus.textContent = 'جارٍ تحميل المحفظة...';
+  await loadConsent();
 
   try {
     const data = await walletRequest('/api/participant/wallet');
@@ -665,7 +974,7 @@ form.addEventListener('submit', async (event) => {
   const email = document.getElementById('rn-auth-email').value.trim();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    options: { emailRedirectTo: 'roarnet://auth-callback' }
   });
   statusBox.textContent = error
     ? 'تعذّر إرسال الرابط: ' + error.message
@@ -706,6 +1015,37 @@ document.getElementById('rn-wallet-link-form').addEventListener('submit', async 
 });
 
 document.getElementById('rn-wallet-refresh').addEventListener('click', loadWallet);
+
+
+document.getElementById('rn-consent-accept').addEventListener('click', async () => {
+  const state = document.getElementById('rn-consent-state');
+  state.textContent = 'جارٍ حفظ الموافقة...';
+  try {
+    await walletRequest('/api/participant/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        accepted: true,
+        disclosureVersion: 'roarnet-sharing-v1'
+      })
+    });
+    await loadConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+});
+
+document.getElementById('rn-consent-revoke').addEventListener('click', async () => {
+  const state = document.getElementById('rn-consent-state');
+  state.textContent = 'جارٍ إيقاف المشاركة...';
+  try {
+    await walletRequest('/api/participant/consent/revoke', { method: 'POST' });
+    await loadConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+});
+
+
 
 const { data: { session: initialSession } } = await supabase.auth.getSession();
 if (initialSession?.user) {
@@ -801,7 +1141,7 @@ if (initialSession?.user) {
 
 <nav class="rn-bottom-nav" aria-label="التنقل الرئيسي">
   <a href="#rn-home" class="active"><span>⌂</span>الرئيسية</a>
-  <a href="#rn-traffic"><span>◉</span>الشبكة</a>
+  <a href="#rn-wallet"><span>◈</span>المحفظة</a>
   <a href="#rn-revenue"><span>↗</span>الإيرادات</a>
   <a href="#rn-auth"><span>♙</span>حسابي</a>
 </nav>

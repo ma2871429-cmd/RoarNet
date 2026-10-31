@@ -369,6 +369,18 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
+    // ROARNET_BLOCK_BACKUP_FILES_V1
+    let decodedPath = url.pathname;
+    try {
+      decodedPath = decodeURIComponent(url.pathname);
+    } catch {
+      return json(res, 400, { error: 'Invalid URL path' });
+    }
+
+    if (/\.bak$/i.test(decodedPath)) {
+      return json(res, 404, { error: 'Not found' });
+    }
+
     if (req.method === "GET" && url.pathname === "/sitemap.xml") {
       const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
@@ -715,6 +727,85 @@ const server = http.createServer(async (req, res) => {
         })),
         note: 'These are reported usage events, not independently verified billable traffic or confirmed earnings.'
       });
+    }
+
+    // ROARNET_ACCOUNT_CONSENT_V1
+    if (url.pathname === '/api/participant/consent' && req.method === 'GET') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 200, { linked: false, accepted: false });
+
+      const consent = db.prepare(`
+        SELECT accepted_at, revoked_at, disclosure_version
+        FROM sharing_consents WHERE node_id=?
+      `).get(account.node_id);
+
+      return json(res, 200, {
+        linked: true,
+        accepted: Boolean(consent && !consent.revoked_at),
+        acceptedAt: consent?.accepted_at || null,
+        revokedAt: consent?.revoked_at || null,
+        disclosureVersion: consent?.disclosure_version || null
+      });
+    }
+
+    if (url.pathname === '/api/participant/consent' && req.method === 'POST') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 404, { error: 'No active linked node' });
+
+      const data = await body(req);
+      if (data.accepted !== true ||
+          data.disclosureVersion !== 'roarnet-sharing-v1') {
+        return json(res, 400, { error: 'Explicit consent and current disclosure required' });
+      }
+
+      const acceptedAt = now();
+      db.prepare(`
+        INSERT INTO sharing_consents(node_id, accepted_at, revoked_at, disclosure_version)
+        VALUES(?,?,NULL,?)
+        ON CONFLICT(node_id) DO UPDATE SET
+          accepted_at=excluded.accepted_at,
+          revoked_at=NULL,
+          disclosure_version=excluded.disclosure_version
+      `).run(account.node_id, acceptedAt, 'roarnet-sharing-v1');
+
+      return json(res, 200, { ok: true, accepted: true, acceptedAt });
+    }
+
+    if (url.pathname === '/api/participant/consent/revoke' && req.method === 'POST') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 404, { error: 'No active linked node' });
+
+      const revokedAt = now();
+      db.prepare(`
+        UPDATE sharing_consents SET revoked_at=?
+        WHERE node_id=? AND revoked_at IS NULL
+      `).run(revokedAt, account.node_id);
+
+      return json(res, 200, { ok: true, accepted: false, revokedAt });
     }
 
     // ROARNET_PARTICIPANT_CONSENT_V1
