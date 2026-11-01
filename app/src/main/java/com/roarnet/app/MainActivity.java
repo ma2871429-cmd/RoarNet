@@ -52,6 +52,20 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
+                JSONObject updatePolicy = fetchUpdatePolicy();
+                int minimumVersion = updatePolicy.getInt("minimumVersionCode");
+                boolean mandatory = updatePolicy.optBoolean("mandatory", true);
+                String downloadUrl = updatePolicy.getString("downloadUrl");
+                String latestVersion = updatePolicy.optString("latestVersion", "أحدث إصدار");
+
+                int currentVersion = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0).versionCode;
+
+                if (mandatory && currentVersion < minimumVersion) {
+                    runOnUiThread(() -> showMandatoryUpdate(latestVersion, downloadUrl));
+                    return;
+                }
+
                 File root = new File(getFilesDir(), "roarnet-server");
                 if (!root.exists() && !root.mkdirs()) {
                     throw new IOException("تعذر إنشاء مجلد الخادم");
@@ -130,10 +144,16 @@ public class MainActivity extends Activity {
 
                 runOnUiThread(this::openLocalWebView);
             } catch (Exception e) {
-                runOnUiThread(() -> showMessage(
-                    "RoarNet",
-                    "تعذر تجهيز الخادم: " + e.getMessage()
-                ));
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                    .setTitle("تعذر تشغيل RoarNet")
+                    .setMessage("تعذر الاتصال أو تجهيز الخادم: " +
+                        e.getMessage())
+                    .setCancelable(false)
+                    .setPositiveButton("إعادة المحاولة",
+                        (dialog, which) -> recreate())
+                    .setNegativeButton("إغلاق التطبيق",
+                        (dialog, which) -> finish())
+                    .show());
             }
         }, "RoarNet-Setup").start();
     }
@@ -463,6 +483,85 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl(LOCAL_URL);
     }
+
+
+    // ROARNET_MANDATORY_UPDATE_V1
+    private JSONObject fetchUpdatePolicy() throws Exception {
+        URL url = new URL(
+            "https://raw.githubusercontent.com/ma2871429-cmd/RoarNet/standalone-apk-integration/update-policy.json"
+        );
+
+        HttpURLConnection connection =
+            (HttpURLConnection) url.openConnection();
+
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(10000);
+        connection.setReadTimeout(10000);
+        connection.setRequestProperty("Accept", "application/json");
+
+        try {
+            int status = connection.getResponseCode();
+            if (status != 200) {
+                throw new IOException("HTTP " + status);
+            }
+
+            try (InputStream in = connection.getInputStream();
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (out.size() + count > 16384) {
+                        throw new IOException("Update policy too large");
+                    }
+                    out.write(buffer, 0, count);
+                }
+                return new JSONObject(out.toString("UTF-8"));
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private void showMandatoryUpdate(String version, String downloadUrl) {
+        new AlertDialog.Builder(this)
+            .setTitle("تحديث RoarNet مطلوب")
+            .setMessage("يتوفر إصدار أحدث: " + version +
+                "\nيجب تحديث التطبيق قبل متابعة الاستخدام.")
+            .setCancelable(false)
+            .setPositiveButton("تنزيل التحديث", (dialog, which) -> {
+                try {
+                    if (!isAllowedUpdateUrl(downloadUrl)) {
+                        showMessage("RoarNet", "رابط التحديث غير صالح.");
+                        return;
+                    }
+
+                    Intent intent = new Intent(
+                        Intent.ACTION_VIEW, Uri.parse(downloadUrl)
+                    );
+                    startActivity(intent);
+                } catch (Exception e) {
+                    showMessage("RoarNet", "تعذر فتح رابط التنزيل.");
+                }
+            })
+            .setNegativeButton("إغلاق التطبيق", (dialog, which) -> finish())
+            .show();
+    }
+    private boolean isAllowedUpdateUrl(String value) {
+        try {
+            Uri uri = Uri.parse(value);
+            String host = uri.getHost();
+            String path = uri.getPath();
+
+            return "https".equalsIgnoreCase(uri.getScheme())
+                && "github.com".equalsIgnoreCase(host)
+                && path != null
+                && path.startsWith("/ma2871429-cmd/RoarNet/releases/");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // /ROARNET_MANDATORY_UPDATE_V1
 
     private void showMessage(String title, String message) {
         LinearLayout layout = new LinearLayout(this);
