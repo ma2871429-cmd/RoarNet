@@ -637,7 +637,7 @@ const server = http.createServer(async (req, res) => {
         linked: false,
         currency: 'USDT',
         network: 'TRC20',
-        minimumPayout: '0.01'
+        minimumPayout: '1.00'
       });
 
       const entries = db.prepare(`
@@ -669,7 +669,7 @@ const server = http.createServer(async (req, res) => {
         label: account.label,
         currency: 'USDT',
         network: 'TRC20',
-        minimumPayout: '0.01',
+        minimumPayout: '1.00',
         balanceCents: Math.max(0, earned - reserved),
         balanceUsdt: (Math.max(0, earned - reserved) / 100).toFixed(2),
         entries: entries.map(e => ({
