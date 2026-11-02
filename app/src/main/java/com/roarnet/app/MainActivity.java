@@ -52,20 +52,6 @@ public class MainActivity extends Activity {
 
         new Thread(() -> {
             try {
-                JSONObject updatePolicy = fetchUpdatePolicy();
-                int minimumVersion = updatePolicy.getInt("minimumVersionCode");
-                boolean mandatory = updatePolicy.optBoolean("mandatory", true);
-                String downloadUrl = updatePolicy.getString("downloadUrl");
-                String latestVersion = updatePolicy.optString("latestVersion", "أحدث إصدار");
-
-                int currentVersion = getPackageManager()
-                    .getPackageInfo(getPackageName(), 0).versionCode;
-
-                if (mandatory && currentVersion < minimumVersion) {
-                    runOnUiThread(() -> showMandatoryUpdate(latestVersion, downloadUrl));
-                    return;
-                }
-
                 File root = new File(getFilesDir(), "roarnet-server");
                 if (!root.exists() && !root.mkdirs()) {
                     throw new IOException("تعذر إنشاء مجلد الخادم");
