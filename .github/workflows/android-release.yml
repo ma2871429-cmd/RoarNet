@@ -34,7 +34,6 @@ jobs:
       - name: Install Android SDK and NDK
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses
           sdkmanager \
             "platforms;android-35" \
             "build-tools;35.0.0" \
