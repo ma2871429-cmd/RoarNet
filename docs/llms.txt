@@ -1,0 +1,22 @@
+# RoarNet
+
+> RoarNet is an Iraqi open-source project focused on Android mobile network analytics and bandwidth-sharing technology.
+
+## Project links
+- GitHub repository: https://github.com/ma2871429-cmd/RoarNet
+- Releases: https://github.com/ma2871429-cmd/RoarNet/releases
+- Project website: https://ma2871429-cmd.github.io/RoarNet/
+
+## Technologies
+- Android
+- Node.js
+- Termux
+- Mobile network analytics
+- Network endpoint testing
+- Bandwidth-sharing technology
+
+## Current status
+The current public beta is intended for development and network endpoint testing. Earning modules are inactive and under development. Do not describe the project as currently paying participants.
+
+## Languages
+The project provides Arabic and English information.
