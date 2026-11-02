@@ -1,0 +1,130 @@
+name: RoarNet Signed Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and Verify RoarNet Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Android SDK
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Install Android SDK and NDK
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;29.0.14206865" \
+            "cmake;3.22.1"
+
+      - name: Download and stage Node.js Mobile
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/nodejs-mobile.zip"
+
+          curl --fail --location --show-error --retry 3 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/ma2871429-cmd/RoarNet/releases/assets/696585675" \
+            -o "$ZIP"
+
+          echo "58e0b7d9455b06703d4001eddfe0445f9cd9671b9045b665dce0e725cd7b994e  $ZIP" | sha256sum --check -
+
+          mkdir -p app/libnode
+          unzip -oq "$ZIP" \
+            'bin/arm64-v8a/libnode.so' \
+            'include/node/*' \
+            -d app/libnode
+
+          test -s app/libnode/bin/arm64-v8a/libnode.so
+          test -s app/libnode/include/node/node.h
+
+      - name: Prepare release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ROARNET_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/roarnet-release.jks"
+          test -s "$RUNNER_TEMP/roarnet-release.jks"
+          chmod 600 "$RUNNER_TEMP/roarnet-release.jks"
+          echo "ROARNET_KEYSTORE_PATH=$RUNNER_TEMP/roarnet-release.jks" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build signed Release APK
+        env:
+          ROARNET_STORE_PASSWORD: ${{ secrets.ROARNET_STORE_PASSWORD }}
+          ROARNET_KEY_PASSWORD: ${{ secrets.ROARNET_KEY_PASSWORD }}
+          ROARNET_KEY_ALIAS: ${{ secrets.ROARNET_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+
+          export ROARNET_STORE_FILE="$ROARNET_KEYSTORE_PATH"
+
+          test -n "$ROARNET_STORE_PASSWORD"
+          test -n "$ROARNET_KEY_PASSWORD"
+          test -n "$ROARNET_KEY_ALIAS"
+          test -s "$ROARNET_STORE_FILE"
+
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Verify APK metadata and signature
+        run: |
+          set -euo pipefail
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+
+          test -s "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/signature.txt"
+
+          EXPECTED="4ed0c8a4afec5cd04905e5a83d6f499a51a24d8a9001c2e7ea9ce4fbd1076f59"
+          grep -Eiq "Signer #1 certificate SHA-256 digest: $EXPECTED" "$RUNNER_TEMP/signature.txt"
+
+          "$AAPT" dump badging "$APK" | tee "$RUNNER_TEMP/badging.txt"
+
+          grep -q "package: name='com.roarnet.app' versionCode='2' versionName='1.1.0'" "$RUNNER_TEMP/badging.txt"
+
+          unzip -Z1 "$APK" > "$RUNNER_TEMP/apk-files.txt"
+          grep -qx 'lib/arm64-v8a/libnode.so' "$RUNNER_TEMP/apk-files.txt"
+          grep -qx 'lib/arm64-v8a/libnative-lib.so' "$RUNNER_TEMP/apk-files.txt"
+
+          sha256sum "$APK" | tee "$RUNNER_TEMP/apk-sha256.txt"
+
+      - name: Upload verified Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoarNet-1.1.0-Beta-Release-ARM64
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
