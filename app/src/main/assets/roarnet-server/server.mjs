@@ -74,6 +74,18 @@ db.exec(`
     disclosure_version TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS provider_consents (
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    provider_id TEXT NOT NULL CHECK(provider_id IN ('proxies_sx')),
+    accepted_at TEXT NOT NULL,
+    revoked_at TEXT,
+    disclosure_version TEXT NOT NULL,
+    PRIMARY KEY(node_id, provider_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_provider_consents_active
+    ON provider_consents(provider_id, node_id, revoked_at);
+
   CREATE TABLE IF NOT EXISTS usage_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id TEXT NOT NULL REFERENCES nodes(id),
@@ -756,6 +768,115 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // ROARNET_PROVIDER_CONSENT_V1
+    if (url.pathname === '/api/participant/providers/proxies_sx/consent' &&
+        req.method === 'GET') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) {
+        return json(res, 200, {
+          linked: false,
+          provider: 'proxies_sx',
+          accepted: false,
+          integrationEnabled: false
+        });
+      }
+
+      const consent = db.prepare(`
+        SELECT accepted_at, revoked_at, disclosure_version
+        FROM provider_consents
+        WHERE node_id=? AND provider_id='proxies_sx'
+      `).get(account.node_id);
+
+      return json(res, 200, {
+        linked: true,
+        provider: 'proxies_sx',
+        accepted: Boolean(consent && !consent.revoked_at),
+        acceptedAt: consent?.accepted_at || null,
+        revokedAt: consent?.revoked_at || null,
+        disclosureVersion: consent?.disclosure_version || null,
+        integrationEnabled: false
+      });
+    }
+
+    if (url.pathname === '/api/participant/providers/proxies_sx/consent' &&
+        req.method === 'POST') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 404, { error: 'No active linked node' });
+
+      const data = await body(req);
+      if (data.accepted !== true ||
+          data.disclosureVersion !== 'proxies-sx-disclosure-v1') {
+        return json(res, 400, {
+          error: 'Explicit Proxies.sx consent and current disclosure required',
+          requiredDisclosureVersion: 'proxies-sx-disclosure-v1'
+        });
+      }
+
+      const acceptedAt = now();
+      db.prepare(`
+        INSERT INTO provider_consents
+          (node_id, provider_id, accepted_at, revoked_at, disclosure_version)
+        VALUES (?, 'proxies_sx', ?, NULL, 'proxies-sx-disclosure-v1')
+        ON CONFLICT(node_id, provider_id) DO UPDATE SET
+          accepted_at=excluded.accepted_at,
+          revoked_at=NULL,
+          disclosure_version=excluded.disclosure_version
+      `).run(account.node_id, acceptedAt);
+
+      return json(res, 200, {
+        ok: true,
+        provider: 'proxies_sx',
+        accepted: true,
+        acceptedAt,
+        integrationEnabled: false
+      });
+    }
+
+    if (url.pathname === '/api/participant/providers/proxies_sx/consent/revoke' &&
+        req.method === 'POST') {
+      const user = await supabaseUser(req);
+      if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
+
+      const account = db.prepare(`
+        SELECT a.node_id FROM participant_accounts a
+        JOIN nodes n ON n.id=a.node_id
+        WHERE a.supabase_user_id=? AND n.status='active'
+      `).get(user.id);
+
+      if (!account) return json(res, 404, { error: 'No active linked node' });
+
+      const revokedAt = now();
+      db.prepare(`
+        UPDATE provider_consents
+        SET revoked_at=?
+        WHERE node_id=? AND provider_id='proxies_sx' AND revoked_at IS NULL
+      `).run(revokedAt, account.node_id);
+
+      return json(res, 200, {
+        ok: true,
+        provider: 'proxies_sx',
+        accepted: false,
+        revokedAt,
+        integrationEnabled: false
+      });
+    }
+
     if (url.pathname === '/api/participant/consent' && req.method === 'POST') {
       const user = await supabaseUser(req);
       if (!user) return json(res, 401, { error: 'Valid Supabase login required' });
@@ -872,6 +993,49 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         accepted: false,
         revokedAt
+      });
+    }
+
+    // ROARNET_NODE_PROVIDER_CONSENT_V1
+    if (url.pathname === '/api/node/providers/proxies_sx/consent' &&
+        req.method === 'GET') {
+      const node = nodeFor(req);
+      if (!node) return json(res, 401, { error: 'Invalid node token' });
+
+      const consent = db.prepare(`
+        SELECT accepted_at, revoked_at, disclosure_version
+        FROM provider_consents
+        WHERE node_id=? AND provider_id='proxies_sx'
+      `).get(node.id);
+
+      return json(res, 200, {
+        provider: 'proxies_sx',
+        accepted: Boolean(consent && !consent.revoked_at),
+        acceptedAt: consent?.accepted_at || null,
+        revokedAt: consent?.revoked_at || null,
+        disclosureVersion: consent?.disclosure_version || null,
+        integrationEnabled: false
+      });
+    }
+
+    if (url.pathname === '/api/node/providers/proxies_sx/consent/revoke' &&
+        req.method === 'POST') {
+      const node = nodeFor(req);
+      if (!node) return json(res, 401, { error: 'Invalid node token' });
+
+      const revokedAt = now();
+      db.prepare(`
+        UPDATE provider_consents
+        SET revoked_at=?
+        WHERE node_id=? AND provider_id='proxies_sx' AND revoked_at IS NULL
+      `).run(revokedAt, node.id);
+
+      return json(res, 200, {
+        ok: true,
+        provider: 'proxies_sx',
+        accepted: false,
+        revokedAt,
+        integrationEnabled: false
       });
     }
 

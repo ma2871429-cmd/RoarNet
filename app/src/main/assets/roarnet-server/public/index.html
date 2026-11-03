@@ -815,6 +815,20 @@ a {
   <button id="rn-consent-revoke" type="button">إيقاف المشاركة وسحب الموافقة</button>
 </section>
 
+<section id="rn-proxies-consent" hidden style="max-width:520px;margin:18px auto;padding:20px;border:1px solid #2788bd;border-radius:16px;background:#10283a;color:#effaff;text-align:right">
+  <h3>موافقة مشاركة الاتصال مع Proxies.sx</h3>
+  <p>هذه موافقة مستقلة تخص شركة Proxies.sx وحدها.</p>
+  <ul style="line-height:1.9">
+    <li>قد يمر جزء من حركة الإنترنت عبر عنوان IP الخاص باتصال جهازك.</li>
+    <li>قد يستهلك النشاط بيانات من باقة الإنترنت الخاصة بك.</li>
+    <li>تخضع المشاركة لشروط الشركة ومتطلبات RoarNet.</li>
+    <li>تسجيل الموافقة هنا لا يعني بدء تشغيل SDK أو إرسال الترافيك حالياً.</li>
+    <li>يمكنك سحب موافقتك من هذه الواجهة في أي وقت.</li>
+  </ul>
+  <p id="rn-proxies-consent-state" role="status" aria-live="polite"></p>
+  <button id="rn-proxies-consent-accept" type="button">أوافق على مشاركة الاتصال مع Proxies.sx</button>
+  <button id="rn-proxies-consent-revoke" type="button">سحب موافقة Proxies.sx</button>
+</section>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -895,6 +909,29 @@ async function loadConsent() {
   }
 }
 
+async function loadProxiesConsent() {
+  const panel = document.getElementById('rn-proxies-consent');
+  const state = document.getElementById('rn-proxies-consent-state');
+
+  try {
+    const data = await walletRequest('/api/participant/providers/proxies_sx/consent');
+    panel.hidden = !data.linked;
+    if (!data.linked) return;
+
+    state.textContent = data.accepted
+      ? 'موافقة Proxies.sx فعالة منذ: ' + data.acceptedAt + ' — التكامل ما زال معطلاً.'
+      : 'موافقة Proxies.sx غير مفعلة. التكامل ما زال معطلاً.';
+
+    document.getElementById('rn-proxies-consent-accept').hidden = data.accepted;
+    document.getElementById('rn-proxies-consent-revoke').hidden = !data.accepted;
+  } catch (error) {
+    panel.hidden = false;
+    document.getElementById('rn-proxies-consent-accept').hidden = true;
+    document.getElementById('rn-proxies-consent-revoke').hidden = true;
+    state.textContent = error.message;
+  }
+}
+
 async function loadWallet() {
   const { data: { session } } = await supabase.auth.getSession();
   wallet.hidden = !session?.user;
@@ -902,6 +939,7 @@ async function loadWallet() {
 
   walletStatus.textContent = 'جارٍ تحميل المحفظة...';
   await loadConsent();
+  await loadProxiesConsent();
 
   try {
     const data = await walletRequest('/api/participant/wallet');
@@ -1031,6 +1069,38 @@ document.getElementById('rn-consent-revoke').addEventListener('click', async () 
 });
 
 
+
+document.getElementById('rn-proxies-consent-accept').addEventListener('click', async () => {
+  const state = document.getElementById('rn-proxies-consent-state');
+  state.textContent = 'جارٍ حفظ موافقة Proxies.sx...';
+
+  try {
+    await walletRequest('/api/participant/providers/proxies_sx/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        accepted: true,
+        disclosureVersion: 'proxies-sx-disclosure-v1'
+      })
+    });
+    await loadProxiesConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+});
+
+document.getElementById('rn-proxies-consent-revoke').addEventListener('click', async () => {
+  const state = document.getElementById('rn-proxies-consent-state');
+  state.textContent = 'جارٍ سحب موافقة Proxies.sx...';
+
+  try {
+    await walletRequest('/api/participant/providers/proxies_sx/consent/revoke', {
+      method: 'POST'
+    });
+    await loadProxiesConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+});
 
 const { data: { session: initialSession } } = await supabase.auth.getSession();
 if (initialSession?.user) {
