@@ -5171,6 +5171,17 @@ if (typeof roarNetMonthlySettlementTimer.unref === 'function') {
 // END ROARNET_MONTHLY_SETTLEMENT_V2
 
 
+
+// ROARNET_ANDROID_GATEWAY_AUTOSTART_V1
+// Start the authenticated Relay Gateway in the same Node process.
+try {
+  await import('./relay/gateway.mjs');
+  console.log('[RoarNet] Relay Gateway module loaded on port 3182');
+} catch (error) {
+  console.error('[RoarNet] Relay Gateway startup failed:', error);
+}
+// END ROARNET_ANDROID_GATEWAY_AUTOSTART_V1
+
 server.listen(PORT, HOST, () => {
   console.log(`RoarNet Independent Core listening on http://${HOST}:${PORT}`);
   console.log('Admin token is stored in .env. Do not share it.');
