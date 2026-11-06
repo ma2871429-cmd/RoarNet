@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs"
+    "check": "node --check server.mjs",
+    "gateway": "node relay/gateway.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }

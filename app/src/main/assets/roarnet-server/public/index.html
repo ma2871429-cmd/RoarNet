@@ -765,40 +765,60 @@ a {
   </div>
 </section>
 
-<!-- ROARNET_PARTICIPANT_WALLET_UI_V1 -->
+<!-- ROARNET_PARTICIPANT_WALLET_UI_V2 -->
 <section id="rn-wallet" hidden style="max-width:520px;margin:20px auto;padding:22px;border:1px solid #176078;border-radius:20px;background:#091d32;color:#effaff;text-align:right">
-  <h2 style="margin-top:0">محفظة المشارك</h2>
-  <p style="color:#9bb7c9">رصيدك من الأرباح المؤكدة — USDT / TRC20</p>
+  <h2 style="margin-top:0">أجهزة حساب RoarNet</h2>
+  <p style="color:#9bb7c9">اربط أجهزتك بحسابك حتى تتمكن من إدارتها من مكان واحد.</p>
 
-  <div id="rn-wallet-balance" style="padding:20px;border-radius:15px;background:#103b51;text-align:center">
-    <small>الرصيد المتاح</small>
-    <div id="rn-wallet-amount" style="font-size:34px;font-weight:850;color:#13dfd0">0.00 USDT</div>
-  </div>
-
-  <div id="rn-wallet-unlinked" hidden style="margin-top:18px">
-    <p>حسابك مسجل. أدخل رمز الربط الذي يصدره مدير RoarNet لعقدتك.</p>
-    <form id="rn-wallet-link-form">
-      <input id="rn-wallet-code" required minlength="36" maxlength="36" autocomplete="off"
-        placeholder="رمز الربط"
+  <div style="margin-top:18px">
+    <h3>ربط جهاز جديد</h3>
+    <form id="rn-wallet-device-form">
+      <input id="rn-wallet-device-token" type="text" required minlength="64" maxlength="64" pattern="[a-fA-F0-9]{64}" autocomplete="off"
+        placeholder="أدخل رمز الجهاز"
         style="box-sizing:border-box;width:100%;padding:13px;border-radius:10px;border:1px solid #164b62;background:#04101f;color:#effaff">
-      <button type="submit" style="margin-top:10px;padding:12px 18px;border:0;border-radius:10px;background:#13dfd0;color:#04101f;font-weight:bold">ربط حساب المشارك</button>
+      <button type="submit" style="margin-top:10px;padding:12px 18px;border:0;border-radius:10px;background:#13dfd0;color:#04101f;font-weight:bold">ربط الجهاز بالحساب</button>
     </form>
   </div>
 
-  <div id="rn-wallet-linked" hidden>
-    <p id="rn-wallet-node" style="color:#9bb7c9"></p>
-    <h3>آخر الحركات</h3>
-    <div id="rn-wallet-entries"></div>
-    <h3>طلبات السحب</h3>
-    <div id="rn-wallet-withdrawals"></div>
-    <p style="color:#9bb7c9;font-size:12px;line-height:1.8">
-      الحد الأدنى المعتمد 1.00 USDT. عرض الرصيد لا يعني تنفيذ تحويل تلقائي؛ التحويل يتطلب ربط مزود دفع فعلي.
-    </p>
+  <div style="margin-top:22px">
+    <h3>أجهزتي المرتبطة</h3>
+    <div id="rn-wallet-devices" style="line-height:1.9">جارٍ تحميل الأجهزة...</div>
+    <div id="rn-wallet-device-picker" style="margin-top:14px">
+      <label for="rn-wallet-device-select">اختر الجهاز لإدارة موافقاته</label>
+      <select id="rn-wallet-device-select" style="display:block;width:100%;padding:12px;margin-top:8px;background:#10283a;color:#effaff;border:1px solid #176078;border-radius:9px">
+        <option value="">اختر جهازاً</option>
+      </select>
+    </div>
   </div>
+
+  <div id="rn-wallet-finance" style="margin-top:24px;padding-top:18px;border-top:1px solid #176078">
+    <h3>محفظتي وأرباحي</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>إجمالي الأرباح</small><strong id="rn-wallet-earned" style="display:block;font-size:23px;color:#13dfd0">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>تمت تسويته محاسبياً</small><strong id="rn-wallet-settled" style="display:block;font-size:23px;color:#13dfd0">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>بانتظار التسوية</small><strong id="rn-wallet-awaiting" style="display:block;font-size:23px;color:#effaff">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>الترافيك المساهم به</small><strong id="rn-wallet-bytes" style="display:block;font-size:20px;color:#effaff">—</strong>
+      </div>
+    </div>
+    <h3 style="margin-top:22px">السجل الشهري</h3>
+    <div id="rn-wallet-months" style="display:grid;gap:10px">
+      <p>جارٍ تحميل سجل الأرباح...</p>
+    </div>
+    <p id="rn-wallet-finance-status" role="status" aria-live="polite" style="font-size:13px;color:#13dfd0"></p>
+    <p style="font-size:12px;line-height:1.8;color:#9bb7c9">التسوية المحاسبية تحدد مستحقاتك. تحويل الأموال الفعلي يحتاج إلى تفعيل مزود دفع معتمد، وحالته الحالية غير مفعّلة.</p>
+  </div>
+
   <p id="rn-wallet-status" role="status" aria-live="polite" style="color:#13dfd0"></p>
-  <button id="rn-wallet-refresh" type="button" style="padding:9px 14px;border:1px solid #176078;border-radius:9px;background:#0d2940;color:#effaff">تحديث المحفظة</button>
+  <button id="rn-wallet-refresh" type="button" style="padding:9px 14px;border:1px solid #176078;border-radius:9px;background:#0d2940;color:#effaff">تحديث المحفظة والأجهزة</button>
 </section>
-<!-- /ROARNET_PARTICIPANT_WALLET_UI_V1 -->
+<!-- /ROARNET_PARTICIPANT_WALLET_UI_V2 -->
 
 <section id="rn-consent" hidden style="max-width:520px;margin:18px auto;padding:20px;border:1px solid #13a6a0;border-radius:16px;background:#10283a;color:#effaff;text-align:right">
   <h3>موافقة مشاركة الإنترنت</h3>
@@ -891,105 +911,391 @@ async function walletRequest(path, options = {}) {
 }
 
 
+
+let selectedDeviceId = '';
+  let rnRelayActiveDeviceId = '';
+
+
+  document.addEventListener('change', () => {
+    setTimeout(() => {
+      if (rnRelayActiveDeviceId &&
+          rnRelayActiveDeviceId !== selectedDeviceId) {
+        if (window.RoarNetRelay) window.RoarNetRelay.stop();
+        rnRelayActiveDeviceId = '';
+        const b = document.getElementById('rn-relay-agent-toggle');
+        if (b) b.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+      }
+    }, 0);
+  });
+
 async function loadConsent() {
   const panel = document.getElementById('rn-consent');
   const state = document.getElementById('rn-consent-state');
+
+  if (!selectedDeviceId) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+
   try {
-    const data = await walletRequest('/api/participant/consent');
-    panel.hidden = !data.linked;
-    if (!data.linked) return;
+    const data = await walletRequest(
+      '/api/participant/device/consent?deviceId=' +
+      encodeURIComponent(selectedDeviceId)
+    );
+
     state.textContent = data.accepted
-      ? 'الموافقة فعالة منذ: ' + data.acceptedAt
+      ? 'الموافقة فعالة منذ: ' + (data.acceptedAt || 'تاريخ التسجيل')
       : 'الموافقة غير مفعلة. يلزم قبول المشاركة قبل تسجيل الاستخدام.';
-    document.getElementById('rn-consent-accept').hidden = data.accepted;
+
+    document.getElementById('rn-consent-accept').hidden = !!data.accepted;
+
+    let relayButton = document.getElementById('rn-relay-agent-toggle');
+    if (!relayButton) {
+      relayButton = document.createElement('button');
+      relayButton.id = 'rn-relay-agent-toggle';
+      relayButton.type = 'button';
+      relayButton.style.cssText =
+        'display:block;margin-top:12px;padding:12px 18px;border:0;border-radius:9px;cursor:pointer;background:#167c68;color:white;font-weight:bold';
+      panel.appendChild(relayButton);
+    }
+    relayButton.hidden = !data.accepted;
+    relayButton.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+    relayButton.onclick = async () => {
+      try {
+        if (!window.RoarNetRelay) throw new Error('خدمة Android غير متاحة.');
+
+        if (rnRelayActiveDeviceId === selectedDeviceId) {
+          window.RoarNetRelay.stop();
+          rnRelayActiveDeviceId = '';
+          relayButton.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+          state.textContent = 'تم إرسال طلب إيقاف الخدمة.';
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('سجل الدخول أولاً.');
+        if (!selectedDeviceId) throw new Error('اختر جهازاً أولاً.');
+
+        window.RoarNetRelay.stop();
+        const result = window.RoarNetRelay.start(
+          session.access_token, selectedDeviceId
+        );
+        rnRelayActiveDeviceId = selectedDeviceId;
+        relayButton.textContent = 'إيقاف خدمة Relay';
+        state.textContent = result;
+      } catch (error) {
+        state.textContent = error.message;
+      }
+    };
     document.getElementById('rn-consent-revoke').hidden = !data.accepted;
   } catch (error) {
-    panel.hidden = false;
     state.textContent = error.message;
   }
 }
 
-async function loadProxiesConsent() {
-  const panel = document.getElementById('rn-proxies-consent');
-  const state = document.getElementById('rn-proxies-consent-state');
+async function loadProviderConsent(provider, prefix, label) {
+  const panel = document.getElementById('rn-' + prefix + '-consent');
+  const state = document.getElementById('rn-' + prefix + '-consent-state');
+
+  if (!selectedDeviceId) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
 
   try {
-    const data = await walletRequest('/api/participant/providers/proxies_sx/consent');
-    panel.hidden = !data.linked;
-    if (!data.linked) return;
+    const data = await walletRequest(
+      '/api/participant/device/provider-consents?deviceId=' +
+      encodeURIComponent(selectedDeviceId)
+    );
 
-    state.textContent = data.accepted
-      ? 'موافقة Proxies.sx فعالة منذ: ' + data.acceptedAt + ' — التكامل ما زال معطلاً.'
-      : 'موافقة Proxies.sx غير مفعلة. التكامل ما زال معطلاً.';
+    const item = (data.consents || []).find(
+      entry => entry.provider === provider
+    );
 
-    document.getElementById('rn-proxies-consent-accept').hidden = data.accepted;
-    document.getElementById('rn-proxies-consent-revoke').hidden = !data.accepted;
+    const accepted = !!(item && item.accepted);
+
+    state.textContent = accepted
+      ? 'موافقة ' + label + ' فعالة منذ: ' +
+        (item.acceptedAt || 'تاريخ التسجيل') +
+        ' — التكامل لا يبدأ بمجرد تسجيل الموافقة.'
+      : 'موافقة ' + label + ' غير مفعلة.';
+
+    document.getElementById('rn-' + prefix + '-consent-accept').hidden = accepted;
+    document.getElementById('rn-' + prefix + '-consent-revoke').hidden = !accepted;
   } catch (error) {
-    panel.hidden = false;
-    document.getElementById('rn-proxies-consent-accept').hidden = true;
-    document.getElementById('rn-proxies-consent-revoke').hidden = true;
     state.textContent = error.message;
+    document.getElementById('rn-' + prefix + '-consent-accept').hidden = true;
+    document.getElementById('rn-' + prefix + '-consent-revoke').hidden = true;
+  }
+}
+
+async function loadProxiesConsent() {
+  return loadProviderConsent('proxies_sx', 'proxies', 'Proxies.sx');
+}
+
+async function loadAllDeviceConsents() {
+  if (!selectedDeviceId) return;
+
+  await Promise.all([
+    loadConsent(),
+    loadProxiesConsent()
+  ]);
+}
+
+
+async function loadWalletEarnings() {
+  const status = document.getElementById('rn-wallet-finance-status');
+  const monthsBox = document.getElementById('rn-wallet-months');
+
+  const money = cents => (Number(cents || 0) / 100).toLocaleString('en-US', {
+    style: 'currency', currency: 'USD'
+  });
+
+  const bytesText = value => {
+    let n = Number(value || 0);
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) {
+      n /= 1024;
+      i++;
+    }
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + units[i];
+  };
+
+  status.textContent = 'جارٍ تحميل بيانات الأرباح...';
+
+  try {
+    const data = await walletRequest('/api/participant/wallet');
+    const totals = data.totals || {};
+
+    document.getElementById('rn-wallet-earned').textContent = money(totals.earnedCents);
+    document.getElementById('rn-wallet-settled').textContent = money(totals.settledCents);
+    document.getElementById('rn-wallet-awaiting').textContent = money(totals.awaitingSettlementCents);
+    document.getElementById('rn-wallet-bytes').textContent = bytesText(totals.contributionBytes);
+
+    monthsBox.replaceChildren();
+    const months = Array.isArray(data.months) ? data.months : [];
+
+    if (!months.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'لا توجد أرباح مسجلة لهذا الحساب حتى الآن.';
+      monthsBox.appendChild(empty);
+    }
+
+    for (const item of months) {
+      const card = document.createElement('article');
+      card.style.cssText = 'padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a;line-height:1.9';
+
+      const heading = document.createElement('strong');
+      heading.textContent = 'شهر ' + String(item.month || '—');
+      heading.style.color = '#13dfd0';
+
+      const earned = document.createElement('div');
+      earned.textContent = 'الأرباح: ' + money(item.earnedCents);
+
+      const settled = document.createElement('div');
+      settled.textContent = 'التسوية المحاسبية: ' + money(item.settledCents);
+
+      const awaiting = document.createElement('div');
+      awaiting.textContent = 'بانتظار التسوية: ' + money(item.awaitingSettlementCents);
+
+      const traffic = document.createElement('div');
+      traffic.textContent = 'المساهمة: ' + bytesText(item.contributionBytes);
+
+      const state = document.createElement('div');
+      state.style.cssText = 'margin-top:6px;color:#9bb7c9;font-size:13px';
+      state.textContent = item.settlementStatus === 'completed'
+        ? 'حالة التسوية: مكتملة محاسبياً'
+        : 'حالة التسوية: بانتظار الإغلاق الشهري';
+
+      const payout = document.createElement('div');
+      payout.style.cssText = 'color:#f0c879;font-size:13px';
+      payout.textContent = item.payoutStatus === 'not_integrated'
+        ? 'تحويل الأموال: لم يتم ربط مزود دفع بعد'
+        : 'حالة تحويل الأموال: ' + String(item.payoutStatus || 'قيد التحقق');
+
+      card.append(heading, earned, settled, awaiting, traffic, state, payout);
+      monthsBox.appendChild(card);
+    }
+
+    status.textContent = 'تم تحديث المحفظة المالية.';
+  } catch (error) {
+    status.textContent = 'تعذّر تحميل الأرباح: ' + error.message;
   }
 }
 
 async function loadWallet() {
   const { data: { session } } = await supabase.auth.getSession();
   wallet.hidden = !session?.user;
-  if (!session?.user) return;
 
-  walletStatus.textContent = 'جارٍ تحميل المحفظة...';
-  await loadConsent();
-  await loadProxiesConsent();
+  const devicesBox = document.getElementById('rn-wallet-devices');
+  const picker = document.getElementById('rn-wallet-device-picker');
+  const select = document.getElementById('rn-wallet-device-select');
+
+  if (!session?.user) {
+    selectedDeviceId = '';
+    document.getElementById('rn-consent').hidden = true;
+    document.getElementById('rn-proxies-consent').hidden = true;
+    return;
+  }
+
+  walletStatus.textContent = 'جارٍ تحميل الأجهزة...';
+  loadWalletEarnings();
+  await loadWithdrawalPanel();
 
   try {
-    const data = await walletRequest('/api/participant/wallet');
-    document.getElementById('rn-wallet-unlinked').hidden = Boolean(data.linked);
-    document.getElementById('rn-wallet-linked').hidden = !data.linked;
-    document.getElementById('rn-wallet-amount').textContent =
-      (data.balanceUsdt || '0.00') + ' USDT';
 
-    if (!data.linked) {
-      walletStatus.textContent = 'الحساب ينتظر الربط بعقدة مشارك.';
+        // ROARNET_AUTO_DEVICE_REGISTRATION_CLIENT_V1
+        const { data: { session: deviceSession } } =
+          await supabase.auth.getSession();
+
+        if (!deviceSession?.access_token) {
+          throw new Error('Participant session is unavailable');
+        }
+
+        const installationKey = 'roarnet_installation_id_v1';
+        let installationId = localStorage.getItem(installationKey);
+
+        if (!installationId ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(installationId)) {
+          const bytes = new Uint8Array(16);
+          crypto.getRandomValues(bytes);
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+          const hex = Array.from(bytes, b =>
+            b.toString(16).padStart(2, '0')
+          ).join('');
+
+          installationId =
+            hex.slice(0, 8) + '-' +
+            hex.slice(8, 12) + '-' +
+            hex.slice(12, 16) + '-' +
+            hex.slice(16, 20) + '-' +
+            hex.slice(20);
+
+          localStorage.setItem(installationKey, installationId);
+        }
+
+        const registrationResponse = await fetch(
+          '/api/participant/devices/register',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + deviceSession.access_token
+            },
+            body: JSON.stringify({
+              installationId,
+              label: 'Android device'
+            })
+          }
+        );
+
+        const registration = await registrationResponse.json();
+
+        if (!registrationResponse.ok || !registration.device?.id) {
+          throw new Error(
+            registration.error || 'Automatic device registration failed'
+          );
+        }
+
+        localStorage.setItem(
+          'roarnet_device_id_v1',
+          registration.device.id
+        );
+        // END ROARNET_AUTO_DEVICE_REGISTRATION_CLIENT_V1
+
+
+        const result = await walletRequest('/api/participant/devices');
+    const devices = Array.isArray(result)
+      ? result
+      : (result.devices || result.items || result.nodes || result.data?.devices || []);
+
+    const previous = selectedDeviceId || select.value;
+
+    devicesBox.replaceChildren();
+    select.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'اختر جهازاً';
+    select.appendChild(placeholder);
+
+    for (const device of devices) {
+      const id = String(device.id ?? '');
+      if (!id) continue;
+
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent =
+        (device.label || device.name || 'جهاز مشارك') +
+        ' — ' + (device.status || 'مسجل');
+      select.appendChild(option);
+
+      const row = document.createElement('div');
+      row.style.cssText =
+        'padding:12px;margin:8px 0;border:1px solid #164b62;border-radius:12px;background:#10283a';
+
+      const name = document.createElement('strong');
+      name.textContent = device.label || device.name ||
+        device.device_name || 'جهاز مشارك';
+
+      const status = document.createElement('div');
+      status.style.color = '#9bb7c9';
+      status.textContent = 'الحالة: ' + (device.status || 'مسجل');
+
+      row.append(name, status);
+      devicesBox.appendChild(row);
+    }
+
+    const usableDevices = devices.filter(device => device.id != null);
+
+    if (!usableDevices.length) {
+      selectedDeviceId = '';
+      picker.hidden = true;
+      document.getElementById('rn-consent').hidden = true;
+      document.getElementById('rn-proxies-consent').hidden = true;
+      devicesBox.textContent =
+        'لا توجد أجهزة مرتبطة. اربط جهازاً بحسابك أولاً.';
+      walletStatus.textContent = 'بانتظار ربط جهاز.';
       return;
     }
 
-    document.getElementById('rn-wallet-node').textContent =
-      'العقدة: ' + data.label;
+    picker.hidden = false;
 
-    const entries = document.getElementById('rn-wallet-entries');
-    entries.replaceChildren();
+    const chosen = usableDevices.find(
+      device => String(device.id) === String(previous)
+    ) || usableDevices.find(
+      device => device.status === 'active'
+    ) || usableDevices[0];
 
-    if (!data.entries?.length) {
-      entries.textContent = 'لا توجد حركات مالية مسجلة حالياً.';
-    } else {
-      for (const item of data.entries) {
-        const row = document.createElement('div');
-        row.style.cssText = 'padding:10px;margin:7px 0;border-bottom:1px solid #164b62';
-        row.textContent =
-          `${item.description || item.kind} — ${item.amountUsdt} USDT — ${item.createdAt}`;
-        entries.appendChild(row);
-      }
-    }
+    selectedDeviceId = String(chosen.id);
+    select.value = selectedDeviceId;
 
-    const withdrawals = document.getElementById('rn-wallet-withdrawals');
-    withdrawals.replaceChildren();
-
-    if (!data.withdrawals?.length) {
-      withdrawals.textContent = 'لا توجد طلبات سحب.';
-    } else {
-      for (const item of data.withdrawals) {
-        const row = document.createElement('div');
-        row.style.cssText = 'padding:10px;margin:7px 0;border-bottom:1px solid #164b62';
-        row.textContent = `${item.amountUsdt} USDT — ${item.network} — ${item.status}`;
-        withdrawals.appendChild(row);
-      }
-    }
-
-    walletStatus.textContent = 'تم تحديث المحفظة.';
+    await loadAllDeviceConsents();
+    walletStatus.textContent = 'تم تحديث الأجهزة والموافقات.';
   } catch (error) {
     walletStatus.textContent = error.message;
   }
 }
+
+document.getElementById('rn-wallet-device-select')
+  .addEventListener('change', async event => {
+    selectedDeviceId = event.target.value;
+    if (selectedDeviceId) {
+      await loadAllDeviceConsents();
+    } else {
+      document.getElementById('rn-consent').hidden = true;
+      document.getElementById('rn-proxies-consent').hidden = true;
+    }
+  });
+
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -1016,21 +1322,27 @@ supabase.auth.onAuthStateChange((_event, session) => {
 });
 
 document.getElementById('rn-auth-logout').addEventListener('click', async () => {
+  if (window.RoarNetRelay) window.RoarNetRelay.stop();
+  rnRelayActiveDeviceId = '';
   const { error } = await supabase.auth.signOut();
   statusBox.textContent = error ? 'تعذّر تسجيل الخروج.' : 'تم تسجيل الخروج.';
 });
 
-document.getElementById('rn-wallet-link-form').addEventListener('submit', async event => {
+document.getElementById('rn-wallet-device-form').addEventListener('submit', async event => {
   event.preventDefault();
-  walletStatus.textContent = 'جارٍ ربط الحساب...';
-  const code = document.getElementById('rn-wallet-code').value.trim();
+  const field = document.getElementById('rn-wallet-device-token');
+  const deviceToken = field.value.trim();
+
+  walletStatus.textContent = 'جارٍ ربط الجهاز...';
+
   try {
-    await walletRequest('/api/participant/link', {
+    await walletRequest('/api/participant/devices/claim', {
       method: 'POST',
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ deviceToken })
     });
-    document.getElementById('rn-wallet-code').value = '';
-    walletStatus.textContent = 'تم ربط الحساب بنجاح.';
+
+    field.value = '';
+    walletStatus.textContent = 'تم ربط الجهاز بالحساب.';
     await loadWallet();
   } catch (error) {
     walletStatus.textContent = error.message;
@@ -1040,67 +1352,101 @@ document.getElementById('rn-wallet-link-form').addEventListener('submit', async 
 document.getElementById('rn-wallet-refresh').addEventListener('click', loadWallet);
 
 
-document.getElementById('rn-consent-accept').addEventListener('click', async () => {
-  const state = document.getElementById('rn-consent-state');
-  state.textContent = 'جارٍ حفظ الموافقة...';
-  try {
-    await walletRequest('/api/participant/consent', {
-      method: 'POST',
-      body: JSON.stringify({
+
+async function saveSharingConsent(accepted) {
+  if (!selectedDeviceId) {
+    alert('اختر جهازاً أولاً.');
+    return;
+  }
+
+  const path = accepted
+    ? '/api/participant/device/consent'
+    : '/api/participant/device/consent/revoke';
+
+  const body = accepted
+    ? {
+        deviceId: selectedDeviceId,
         accepted: true,
         disclosureVersion: 'roarnet-sharing-v1'
-      })
-    });
-    await loadConsent();
-  } catch (error) {
-    state.textContent = error.message;
-  }
-});
+      }
+    : { deviceId: selectedDeviceId };
 
-document.getElementById('rn-consent-revoke').addEventListener('click', async () => {
   const state = document.getElementById('rn-consent-state');
-  state.textContent = 'جارٍ إيقاف المشاركة...';
+  state.textContent = 'جارٍ حفظ الموافقة...';
+
   try {
-    await walletRequest('/api/participant/consent/revoke', { method: 'POST' });
+    await walletRequest(path, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    if (!accepted && window.RoarNetRelay) window.RoarNetRelay.stop();
+    if (!accepted) { rnRelayActiveDeviceId = ''; const b = document.getElementById('rn-relay-agent-toggle'); if (b) b.textContent = 'تشغيل خدمة Relay — وضع التجهيز'; }
     await loadConsent();
   } catch (error) {
     state.textContent = error.message;
   }
-});
+}
 
+async function saveProviderConsent(provider, prefix, accepted) {
+  if (!selectedDeviceId) {
+    alert('اختر جهازاً أولاً.');
+    return;
+  }
 
+  const versions = {
+    proxies_sx: 'roarnet-proxies-sx-v1'
+  };
 
-document.getElementById('rn-proxies-consent-accept').addEventListener('click', async () => {
-  const state = document.getElementById('rn-proxies-consent-state');
-  state.textContent = 'جارٍ حفظ موافقة Proxies.sx...';
+  const path = accepted
+    ? '/api/participant/device/provider-consents'
+    : '/api/participant/device/provider-consents/revoke';
 
-  try {
-    await walletRequest('/api/participant/providers/proxies_sx/consent', {
-      method: 'POST',
-      body: JSON.stringify({
+  const body = accepted
+    ? {
+        deviceId: selectedDeviceId,
+        provider,
         accepted: true,
-        disclosureVersion: 'proxies-sx-disclosure-v1'
-      })
-    });
-    await loadProxiesConsent();
-  } catch (error) {
-    state.textContent = error.message;
-  }
-});
+        disclosureVersion: versions[provider]
+      }
+    : {
+        deviceId: selectedDeviceId,
+        provider
+      };
 
-document.getElementById('rn-proxies-consent-revoke').addEventListener('click', async () => {
-  const state = document.getElementById('rn-proxies-consent-state');
-  state.textContent = 'جارٍ سحب موافقة Proxies.sx...';
+  const state = document.getElementById(
+    'rn-' + prefix + '-consent-state'
+  );
+  state.textContent = 'جارٍ حفظ الموافقة...';
 
   try {
-    await walletRequest('/api/participant/providers/proxies_sx/consent/revoke', {
-      method: 'POST'
+    await walletRequest(path, {
+      method: 'POST',
+      body: JSON.stringify(body)
     });
-    await loadProxiesConsent();
+
+    // ROARNET_PROXIES_SDK_REVOKE_STOP_V1
+    if (provider === 'proxies_sx' && !accepted &&
+        window.RoarNetProxiesSDK) {
+      window.RoarNetProxiesSDK.stop();
+    }
+
+    if (provider === 'proxies_sx') await loadProxiesConsent();
   } catch (error) {
     state.textContent = error.message;
   }
-});
+}
+
+document.getElementById('rn-consent-accept')
+  .addEventListener('click', () => saveSharingConsent(true));
+
+document.getElementById('rn-consent-revoke')
+  .addEventListener('click', () => saveSharingConsent(false));
+
+document.getElementById('rn-proxies-consent-accept')
+  .addEventListener('click', () => saveProviderConsent('proxies_sx', 'proxies', true));
+
+document.getElementById('rn-proxies-consent-revoke')
+  .addEventListener('click', () => saveProviderConsent('proxies_sx', 'proxies', false));
 
 const { data: { session: initialSession } } = await supabase.auth.getSession();
 if (initialSession?.user) {
@@ -1110,6 +1456,107 @@ if (initialSession?.user) {
   wallet.hidden = false;
   await loadWallet();
 }
+
+
+// ROARNET_WITHDRAWAL_UI_V1
+async function loadWithdrawalPanel() {
+  const message = document.getElementById('rn-withdraw-message');
+  const list = document.getElementById('rn-withdraw-list');
+  if (!list) return;
+
+  try {
+    const data = await walletRequest('/api/participant/withdrawals');
+
+    document.getElementById('rn-withdraw-available').textContent =
+      '$' + (Number(data.availableCents || 0) / 100).toFixed(2);
+
+    list.replaceChildren();
+
+    for (const item of (data.withdrawals || [])) {
+      const li = document.createElement('li');
+      const amount = (Number(item.amount_cents || 0) / 100).toFixed(2);
+      const statuses = {
+        queued: 'بانتظار المراجعة اليدوية',
+        processing: 'جارٍ تنفيذ التحويل',
+        paid: 'تم تأكيد التحويل',
+        failed: 'تعذر التحويل — يحتاج معالجة'
+      };
+      li.textContent =
+        '#' + item.id + ' — $' + amount + ' — ' +
+        (statuses[item.status] || item.status) +
+        ' — ' + String(item.created_at || '');
+      list.appendChild(li);
+    }
+
+    if (!data.withdrawals?.length) {
+      const li = document.createElement('li');
+      li.textContent = 'لا توجد طلبات سحب حالياً.';
+      list.appendChild(li);
+    }
+
+    message.textContent = 'تم تحديث سجل السحب.';
+  } catch (error) {
+    message.textContent = error.message || 'تعذر تحميل سجل السحب.';
+  }
+}
+
+document.getElementById('rn-withdraw-refresh')
+  ?.addEventListener('click', loadWithdrawalPanel);
+
+document.getElementById('rn-withdraw-submit')
+  ?.addEventListener('click', async () => {
+    const input = document.getElementById('rn-withdraw-amount');
+    const addressInput = document.getElementById('rn-withdraw-address');
+    const destinationAddress = addressInput.value.trim();
+    const message = document.getElementById('rn-withdraw-message');
+    const button = document.getElementById('rn-withdraw-submit');
+
+    const amount = Number(input.value);
+    const amountCents = Math.round(amount * 100);
+
+    if (!Number.isFinite(amount) || amount < 1 ||
+        !Number.isSafeInteger(amountCents) ||
+        Math.abs(amount * 100 - amountCents) > 0.000001) {
+      message.textContent = 'الحد الأدنى للسحب دولار واحد، أدخل مبلغاً صحيحاً.';
+      return;
+    }
+
+    if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(destinationAddress)) {
+      message.textContent = 'تحقق من عنوان محفظة TRC20؛ يجب أن يبدأ بحرف T ويكون صحيح التنسيق.';
+      return;
+    }
+
+    if (button.disabled) return;
+
+    button.disabled = true;
+    message.textContent = 'جارٍ تقديم الطلب...';
+
+    try {
+      const data = await walletRequest(
+        '/api/participant/withdrawals',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amountCents, destinationAddress })
+        }
+      );
+
+      input.value = '';
+      addressInput.value = '';
+      message.textContent = 'تم تسجيل طلب السحب في قائمة الانتظار.';
+      await loadWithdrawalPanel();
+
+      if (typeof loadWalletEarnings === 'function') {
+        await loadWalletEarnings();
+      }
+    } catch (error) {
+      message.textContent = error.message || 'حدث خطأ أثناء تقديم الطلب.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+// END ROARNET_WITHDRAWAL_UI_V1
+
 </script>
 
 <!-- ROARNET_ADMIN_LINK_CODE_UI_V1 -->
@@ -1499,6 +1946,249 @@ if (initialSession?.user) {
 })();
 </script>
 <!-- /ROARNET_ADMIN_FINANCE_DASHBOARD_V1 -->
+
+
+
+<!-- ROARNET_ADMIN_WITHDRAWAL_PANEL_V1 -->
+<section id="rn-admin-withdrawals"
+ style="margin:18px 0;padding:18px;border:1px solid #416078;border-radius:14px;background:#102333;color:#e8f3fa">
+  <h3>إدارة طلبات سحب المشاركين</h3>
+  <p style="font-size:13px;color:#b8ccda">
+    راجع عنوان المحفظة والمبلغ قبل معالجة الطلب. تسجيل التحويل كمدفوع يتطلب مرجع معاملة TRON بعد التحقق اليدوي منها.
+  </p>
+  <button id="rn-admin-withdrawals-refresh" type="button"
+   style="padding:10px 16px;border:0;border-radius:8px">
+   تحديث طلبات السحب
+  </button>
+  <p id="rn-admin-withdrawals-status" role="status"></p>
+  <div id="rn-admin-withdrawals-list"></div>
+</section>
+
+<script>
+(function () {
+  const panel = document.getElementById("rn-admin-withdrawals");
+  const list = document.getElementById("rn-admin-withdrawals-list");
+  const statusBox = document.getElementById("rn-admin-withdrawals-status");
+  const refreshButton = document.getElementById("rn-admin-withdrawals-refresh");
+
+  if (!panel || !window.RoarNetAdmin ||
+      typeof window.RoarNetAdmin.getAdminWithdrawals !== "function" ||
+      typeof window.RoarNetAdmin.updateAdminWithdrawal !== "function") {
+    if (panel) {
+      statusBox.textContent = "إدارة السحب متاحة داخل تطبيق RoarNet على أندرويد.";
+    }
+    return;
+  }
+
+  function parseResult(raw) {
+    let result;
+    try {
+      result = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (_) {
+      throw new Error("استجابة الخادم غير مفهومة.");
+    }
+    if (!result || result.error) {
+      throw new Error(result && result.error ? result.error : "تعذر تنفيذ العملية.");
+    }
+    return result;
+  }
+
+  function money(cents) {
+    return "$" + (Number(cents || 0) / 100).toFixed(2);
+  }
+
+  function addText(parent, tag, value) {
+    const element = document.createElement(tag);
+    element.textContent = value == null ? "" : String(value);
+    parent.appendChild(element);
+    return element;
+  }
+
+  function render(items) {
+    list.replaceChildren();
+
+    if (!items.length) {
+      addText(list, "p", "لا توجد طلبات سحب حالياً.");
+      return;
+    }
+
+    items.forEach(function (item) {
+      const card = document.createElement("div");
+      card.style.cssText =
+        "padding:14px;margin:12px 0;border:1px solid #38566b;border-radius:10px;background:#172f40";
+
+      addText(card, "strong",
+        "طلب #" + item.id + " — " + money(item.amount_cents));
+
+      addText(card, "p", "معرّف المشارك: " + item.participant_id);
+      addText(card, "p", "الشبكة: " + (item.network || "TRC20"));
+      addText(card, "p", "الحالة: " + item.status);
+      addText(card, "p", "عنوان المحفظة: " + (item.destination_address || ""));
+      addText(card, "p", "تاريخ الطلب: " + (item.created_at || ""));
+
+      if (item.payout_reference) {
+        addText(card, "p", "مرجع التحويل: " + item.payout_reference);
+      }
+      if (item.admin_note) {
+        addText(card, "p", "ملاحظة الإدارة: " + item.admin_note);
+      }
+
+      if (item.status === "queued" || item.status === "processing") {
+        const note = document.createElement("input");
+        note.type = "text";
+        note.placeholder = "ملاحظة الإدارة أو سبب الرفض";
+        note.setAttribute("data-note", "");
+        note.style.cssText =
+          "display:block;width:100%;box-sizing:border-box;padding:10px;margin:8px 0;border-radius:7px";
+        card.appendChild(note);
+
+        if (item.status === "queued") {
+          const processButton = document.createElement("button");
+          processButton.type = "button";
+          processButton.textContent = "بدء المعالجة";
+          processButton.dataset.action = "processing";
+          processButton.dataset.id = item.id;
+          processButton.style.margin = "4px";
+          card.appendChild(processButton);
+        }
+
+        if (item.status === "processing") {
+          const tx = document.createElement("input");
+          tx.type = "text";
+          tx.placeholder = "مرجع معاملة TRON (64 خانة hex)";
+          tx.setAttribute("data-tx", "");
+          tx.autocomplete = "off";
+          tx.spellcheck = false;
+          tx.style.cssText =
+            "display:block;width:100%;box-sizing:border-box;padding:10px;margin:8px 0;border-radius:7px";
+          card.appendChild(tx);
+
+          const paidButton = document.createElement("button");
+          paidButton.type = "button";
+          paidButton.textContent = "تسجيل التحويل كمدفوع";
+          paidButton.dataset.action = "paid";
+          paidButton.dataset.id = item.id;
+          paidButton.style.margin = "4px";
+          card.appendChild(paidButton);
+        }
+
+        const failButton = document.createElement("button");
+        failButton.type = "button";
+        failButton.textContent = "رفض الطلب";
+        failButton.dataset.action = "failed";
+        failButton.dataset.id = item.id;
+        failButton.style.margin = "4px";
+        card.appendChild(failButton);
+      }
+
+      list.appendChild(card);
+    });
+  }
+
+  function refresh() {
+    statusBox.textContent = "جاري تحميل طلبات السحب...";
+    try {
+      const result = parseResult(window.RoarNetAdmin.getAdminWithdrawals());
+      render(Array.isArray(result.withdrawals) ? result.withdrawals : []);
+      statusBox.textContent = "تم تحديث سجل طلبات السحب.";
+    } catch (error) {
+      statusBox.textContent = error.message || "تعذر تحميل الطلبات.";
+    }
+  }
+
+  refreshButton.addEventListener("click", refresh);
+
+  list.addEventListener("click", function (event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+
+    const card = button.parentElement;
+    const id = button.dataset.id;
+    const action = button.dataset.action;
+    const note = card.querySelector("[data-note]");
+    const tx = card.querySelector("[data-tx]");
+
+    const payload = {
+      status: action,
+      adminNote: note ? note.value.trim() : ""
+    };
+
+    if (action === "paid") {
+      payload.payoutReference = tx ? tx.value.trim() : "";
+      if (!/^[a-fA-F0-9]{64}$/.test(payload.payoutReference)) {
+        statusBox.textContent = "أدخل مرجع معاملة TRON صحيحاً بطول 64 خانة.";
+        return;
+      }
+    }
+
+    if (action === "failed" && payload.adminNote.length < 3) {
+      statusBox.textContent = "اكتب سبب رفض الطلب.";
+      return;
+    }
+
+    if (action === "paid" &&
+        !window.confirm("هل تحققت يدوياً من معاملة TRON ومن وصول المبلغ إلى المحفظة؟")) {
+      return;
+    }
+
+    button.disabled = true;
+    statusBox.textContent = "جاري تحديث الطلب...";
+
+    try {
+      const result = parseResult(
+        window.RoarNetAdmin.updateAdminWithdrawal(
+          String(id),
+          JSON.stringify(payload)
+        )
+      );
+      statusBox.textContent = "تم تحديث حالة الطلب #" + result.id;
+      refresh();
+    } catch (error) {
+      statusBox.textContent = error.message || "تعذر تحديث الطلب.";
+      button.disabled = false;
+    }
+  });
+
+  refresh();
+})();
+</script>
+<!-- END ROARNET_ADMIN_WITHDRAWAL_PANEL_V1 -->
+
+
+<!-- ROARNET_WITHDRAWAL_UI_V1 -->
+<section id="roarnet-withdrawal-panel"
+ style="display:block;margin:18px 0;padding:18px;border:1px solid #29465b;border-radius:14px;background:#102333;color:#e8f3fa">
+  <h3 style="margin:0 0 12px">طلبات سحب الأرباح</h3>
+  <p style="font-size:13px;color:#a9c3d4;line-height:1.7">
+    الرصيد المتاح للسحب:
+    <strong id="rn-withdraw-available">$0.00</strong>
+  </p>
+  <label for="rn-withdraw-amount">مبلغ السحب بالدولار</label>
+  <input id="rn-withdraw-amount" type="number" min="1"
+   step="0.01" placeholder="مثال: 5.00"
+   style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;border-radius:8px">
+  <label for="rn-withdraw-address">عنوان محفظة USDT على شبكة TRC20</label>
+  <input id="rn-withdraw-address" type="text"
+   inputmode="text" autocomplete="off" spellcheck="false"
+   placeholder="أدخل عنوان TRON الذي يبدأ بحرف T"
+   style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;border-radius:8px">
+  <button id="rn-withdraw-submit" type="button"
+   style="padding:11px 18px;border:0;border-radius:8px;cursor:pointer">
+   تقديم طلب السحب
+  </button>
+  <button id="rn-withdraw-refresh" type="button"
+   style="padding:11px 18px;border:0;border-radius:8px;cursor:pointer">
+   تحديث السجل
+  </button>
+  <p id="rn-withdraw-message" role="status"
+   style="font-size:13px;line-height:1.7"></p>
+  <h4>سجل الطلبات</h4>
+  <ul id="rn-withdraw-list" style="padding-right:20px;line-height:2"></ul>
+  <p style="font-size:12px;color:#a9c3d4">
+    تقديم الطلب يحجز المبلغ محاسبياً. التحويل الفعلي يحتاج تفعيل مزود دفع.
+  </p>
+</section>
+<!-- END ROARNET_WITHDRAWAL_UI_V1 -->
 
 </body>
 </html>

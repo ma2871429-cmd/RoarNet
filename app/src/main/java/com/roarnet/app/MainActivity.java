@@ -63,6 +63,10 @@ public class MainActivity extends Activity {
                     "roarnet-server/public",
                     new File(root, "public")
                 );
+                copyAssetDirectory(
+                    "roarnet-server/relay",
+                    new File(root, "relay")
+                );
 
                 File database = new File(root, "roarnet.sqlite");
                 SharedPreferences prefs =
@@ -98,8 +102,22 @@ public class MainActivity extends Activity {
                         int code = c.getResponseCode();
                         c.disconnect();
                         if (code > 0) {
-                            ready = true;
-                            break;
+                            HttpURLConnection gateway =
+                                (HttpURLConnection)
+                                new URL("http://127.0.0.1:3182/health")
+                                    .openConnection();
+
+                            gateway.setConnectTimeout(1500);
+                            gateway.setReadTimeout(1500);
+                            gateway.setRequestMethod("GET");
+
+                            int gatewayCode = gateway.getResponseCode();
+                            gateway.disconnect();
+
+                            if (gatewayCode == 200) {
+                                ready = true;
+                                break;
+                            }
                         }
                     } catch (Exception ignored) {
                         Thread.sleep(500);
@@ -177,6 +195,51 @@ public class MainActivity extends Activity {
         }
     }
 
+
+    // ROARNET_ANDROID_RELAY_BRIDGE_V1
+    private final class RoarNetRelayBridge {
+        @JavascriptInterface
+        public String start(String accessToken, String deviceId) {
+            if (accessToken == null || accessToken.length() < 20 ||
+                deviceId == null ||
+                !deviceId.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
+                return "بيانات تشغيل Relay غير صالحة.";
+            }
+            try {
+                Intent intent = new Intent(MainActivity.this, RelayAgentService.class);
+                intent.putExtra("access_token", accessToken);
+                intent.putExtra("device_id", deviceId);
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    startForegroundService(intent);
+                } else {
+                    startService(intent);
+                }
+                return "تم إرسال طلب تشغيل الخدمة. ستتوقف إذا تعذر التحقق من الموافقة.";
+            } catch (Exception e) {
+                return "تعذر تشغيل خدمة Relay.";
+            }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            try {
+                stopService(new Intent(MainActivity.this, RelayAgentService.class));
+            } catch (Exception ignored) { }
+        }
+    }
+
+    // ROARNET_PROXIES_SDK_STOP_BRIDGE_V1
+    private final class RoarNetProxiesSDKBridge {
+        @JavascriptInterface
+        public String stop() {
+            try {
+                sx.proxies.peer.ProxiesPeerSDK.getInstance().stop();
+                return "تم إرسال طلب إيقاف SDK.";
+            } catch (Exception e) {
+                return "SDK غير مهيأ أو متوقف.";
+            }
+        }
+    }
 
     // ROARNET_ANDROID_ADMIN_BRIDGE_V1
     private final class RoarNetAdminBridge {
@@ -276,7 +339,9 @@ public class MainActivity extends Activity {
                 }
 
                 if (!path.equals("api/admin/summary") &&
-                    !path.equals("api/admin/provider-revenue-batches")) {
+                    !path.equals("api/admin/provider-revenue-batches") &&
+                    !path.equals("api/admin/withdrawals") &&
+                    !path.matches("api/admin/withdrawals/[0-9]+/status")) {
                     return "{\"error\":\"مسار إداري غير مسموح.\"}";
                 }
 
@@ -315,6 +380,33 @@ public class MainActivity extends Activity {
             } finally {
                 if (connection != null) connection.disconnect();
             }
+        }
+
+
+        // ROARNET_ADMIN_WITHDRAWAL_BRIDGE_V1
+        @JavascriptInterface
+        public String getAdminWithdrawals() {
+            return adminRequest("api/admin/withdrawals", "GET", "");
+        }
+
+        @JavascriptInterface
+        public String updateAdminWithdrawal(String id, String json) {
+            if (id == null || !id.matches("[0-9]{1,12}") ||
+                json == null || json.length() > 4096) {
+                return "{\"error\":\"بيانات طلب السحب غير صالحة.\"}";
+            }
+
+            try {
+                new JSONObject(json);
+            } catch (Exception e) {
+                return "{\"error\":\"صيغة بيانات السحب غير صحيحة.\"}";
+            }
+
+            return adminRequest(
+                "api/admin/withdrawals/" + id + "/status",
+                "POST",
+                json
+            );
         }
 
         @JavascriptInterface
@@ -464,6 +556,8 @@ public class MainActivity extends Activity {
         });
 
         web.addJavascriptInterface(new RoarNetAdminBridge(), "RoarNetAdmin");
+        web.addJavascriptInterface(new RoarNetRelayBridge(), "RoarNetRelay");
+        web.addJavascriptInterface(new RoarNetProxiesSDKBridge(), "RoarNetProxiesSDK");
         web.setBackgroundColor(Color.rgb(16, 24, 39));
         // /ROARNET_WEBVIEW_LOCAL_ONLY_V1
         setContentView(web);

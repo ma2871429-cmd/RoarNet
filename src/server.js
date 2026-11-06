@@ -23,7 +23,8 @@ const cfg = {
   providerEnabled: process.env.PROVIDER_ENABLED === 'true', providerName: process.env.PROVIDER_NAME || 'unconfigured',
   providerApiBase: process.env.PROVIDER_API_BASE || '', providerApiKey: process.env.PROVIDER_API_KEY || '',
   providerDeviceId: process.env.PROVIDER_DEVICE_ID || '', providerDeviceToken: process.env.PROVIDER_DEVICE_TOKEN || '',
-  payoutsEnabled: process.env.PAYOUTS_ENABLED === 'true'
+  payoutsEnabled: process.env.PAYOUTS_ENABLED === 'true',
+  encryptionKey: process.env.APP_ENCRYPTION_KEY || ''
 };
 if (cfg.sessionSecret.length < 32 || cfg.adminPassword.length < 12 || cfg.adminPassword === 'change-this-long-password-now') {
   console.error('Setup required: copy .env.example to .env, set SESSION_SECRET (32+ chars) and a strong ADMIN_PASSWORD (12+ chars).');
@@ -35,17 +36,74 @@ const db = new DatabaseSync(dbFile);
 db.exec(`PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, created_at TEXT NOT NULL, expires_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('demo','provider_confirmed','payout_request')), amount REAL NOT NULL, currency TEXT NOT NULL, reference TEXT NOT NULL UNIQUE, status TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('demo','provider_confirmed','payout_request')), amount REAL NOT NULL, currency TEXT NOT NULL, reference TEXT NOT NULL UNIQUE, status TEXT NOT NULL, source TEXT NOT NULL, created_at TEXT NOT NULL, transfer_reference TEXT);
 CREATE TABLE IF NOT EXISTS provider_snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, device_id TEXT, payload_json TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS developer_payouts (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ reference TEXT NOT NULL UNIQUE,
+ method TEXT NOT NULL CHECK(method IN ('usdt_trc20','zain_cash')),
+ amount_usd REAL NOT NULL CHECK(amount_usd > 0),
+ destination TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('pending','paid','rejected')),
+ transfer_reference TEXT,
+ created_at TEXT NOT NULL,
+ paid_at TEXT
+);
+
 `);
+
+const ledgerColumns = db.prepare('PRAGMA table_info(ledger)').all();
+if (!ledgerColumns.some(column => column.name === 'transfer_reference')) {
+  db.exec('ALTER TABLE ledger ADD COLUMN transfer_reference TEXT');
+}
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ledger_transfer_reference
+ON ledger(transfer_reference)
+WHERE transfer_reference IS NOT NULL AND TRIM(transfer_reference) <> '';`);
+
+db.exec(`
+ CREATE UNIQUE INDEX IF NOT EXISTS
+ ux_developer_payouts_transfer_reference
+ ON developer_payouts(transfer_reference)
+ WHERE transfer_reference IS NOT NULL
+   AND TRIM(transfer_reference) <> '';
+`);
+
 const now = () => new Date().toISOString();
 const loginAttempts = new Map();
-function loginAllowed(req) { const key = req.socket.remoteAddress || 'unknown'; const t = Date.now(); const old = loginAttempts.get(key) || { count: 0, until: t + 15 * 60_000 }; if (t > old.until) { old.count = 0; old.until = t + 15 * 60_000; } if (old.count >= 10) return false; old.count++; loginAttempts.set(key, old); return true; }
+function loginAllowed(req) {
+ const key = req.socket.remoteAddress || 'unknown';
+ const t = Date.now();
+ const old = loginAttempts.get(key) || { count: 0, until: t + 15 * 60_000 };
+ if (t > old.until) {
+  old.count = 0;
+  old.until = t + 15 * 60_000;
+ }
+ if (old.count >= 10) return false;
+ old.count++;
+ loginAttempts.set(key, old);
+ return true;
+}
+
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const safeEqual = (a,b) => { const aa=Buffer.from(String(a)); const bb=Buffer.from(String(b)); return aa.length===bb.length && crypto.timingSafeEqual(aa,bb); };
 function audit(event, detail='') { db.prepare('INSERT INTO audit_log(event,detail,created_at) VALUES(?,?,?)').run(event, detail.slice(0,500), now()); }
-function json(res, status, data, extra={}) { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...extra}); res.end(JSON.stringify(data)); }
+const securityHeaders = {
+ 'X-Content-Type-Options': 'nosniff',
+ 'X-Frame-Options': 'SAMEORIGIN',
+ 'Referrer-Policy': 'strict-origin-when-cross-origin',
+ 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+};
+function json(res, status, data, extra={}) {
+ res.writeHead(status, {
+  'Content-Type':'application/json; charset=utf-8',
+  'Cache-Control':'no-store',
+  ...securityHeaders,
+  ...extra
+ });
+ res.end(JSON.stringify(data));
+}
 function readBody(req, max=16_384) { return new Promise((resolve,reject)=>{let data=''; req.on('data',c=>{data+=c; if(data.length>max){reject(new Error('BODY_TOO_LARGE'));req.destroy();}});req.on('end',()=>{try{resolve(data?JSON.parse(data):{});}catch{reject(new Error('BAD_JSON'));}});req.on('error',reject);}); }
 function cookies(req) { return Object.fromEntries((req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [x.slice(0,i),decodeURIComponent(x.slice(i+1))]})); }
 function authorized(req) { const raw=cookies(req).roarnet_session; if(!raw) return false; const row=db.prepare('SELECT expires_at FROM sessions WHERE token_hash=?').get(sha(raw)); if(!row || row.expires_at < Date.now()){ if(row) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha(raw)); return false;} return true; }
@@ -54,12 +112,28 @@ function totals() {
  const confirmed=db.prepare("SELECT COALESCE(SUM(amount),0) AS v FROM ledger WHERE kind='provider_confirmed' AND status='confirmed'").get().v;
  const demo=db.prepare("SELECT COALESCE(SUM(amount),0) AS v FROM ledger WHERE kind='demo'").get().v;
  const pending=db.prepare("SELECT COALESCE(SUM(-amount),0) AS v FROM ledger WHERE kind='payout_request' AND status='pending'").get().v;
- return {confirmedUsd:Number(confirmed.toFixed(6)), demoUsd:Number(demo.toFixed(6)), pendingPayoutUsd:Number(pending.toFixed(6))};
+ const paid=db.prepare("SELECT COALESCE(SUM(-amount),0) AS v FROM ledger WHERE kind='payout_request' AND status='paid'").get().v;
+ return {
+  confirmedUsd:Number(confirmed.toFixed(6)),
+  demoUsd:Number(demo.toFixed(6)),
+  pendingPayoutUsd:Number(pending.toFixed(6)),
+  paidPayoutUsd:Number(paid.toFixed(6)),
+  availableUsd:Number(Math.max(0,confirmed-pending-paid).toFixed(6))
+ };
 }
+function sealSetting(value) {
+ if (cfg.encryptionKey.length < 32) throw new Error('APP_ENCRYPTION_KEY_MISSING');
+ const key=crypto.createHash('sha256').update(cfg.encryptionKey).digest(); const iv=crypto.randomBytes(12);
+ const cipher=crypto.createCipheriv('aes-256-gcm',key,iv); const data=Buffer.concat([cipher.update(String(value),'utf8'),cipher.final()]);
+ return [iv.toString('base64'),cipher.getAuthTag().toString('base64'),data.toString('base64')].join('.');
+}
+function unsealSetting(value) { try { if(cfg.encryptionKey.length<32)return ''; const [iv,tag,data]=value.split('.'); const key=crypto.createHash('sha256').update(cfg.encryptionKey).digest(); const d=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(iv,'base64')); d.setAuthTag(Buffer.from(tag,'base64')); return Buffer.concat([d.update(Buffer.from(data,'base64')),d.final()]).toString('utf8'); } catch { return ''; } }
+function getSetting(key) { const row=db.prepare('SELECT value FROM app_settings WHERE key=?').get(key); return row?unsealSetting(row.value):''; }
+function providerConfig() { const name=getSetting('name')||cfg.providerName, base=getSetting('base')||cfg.providerApiBase, apiKey=getSetting('apiKey')||cfg.providerApiKey, deviceId=getSetting('deviceId')||cfg.providerDeviceId, token=getSetting('token')||cfg.providerDeviceToken; const configured=!!(base&&apiKey&&deviceId&&token); return {name,base,apiKey,deviceId,token,configured,enabled:cfg.providerEnabled&&configured}; }
 async function providerGet(endpoint) {
- if(!cfg.providerEnabled || !cfg.providerApiKey || !cfg.providerDeviceId || !cfg.providerDeviceToken) throw new Error('PROVIDER_NOT_CONFIGURED');
- const url=new URL(endpoint, cfg.providerApiBase);
- const response=await fetch(url,{headers:{'Authorization':`Bearer ${cfg.providerDeviceToken}`,'X-API-Key':cfg.providerApiKey,'Accept':'application/json'},signal:AbortSignal.timeout(8000)});
+ const pc=providerConfig(); if(!pc.enabled) throw new Error('PROVIDER_NOT_CONFIGURED');
+ const url=new URL(endpoint, pc.base);
+ const response=await fetch(url,{headers:{'Authorization':`Bearer ${pc.token}`,'X-API-Key':pc.apiKey,'Accept':'application/json'},signal:AbortSignal.timeout(8000)});
  if(!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);
  return response.json();
 }
@@ -75,13 +149,121 @@ const server=http.createServer(async(req,res)=>{
    db.prepare('INSERT INTO sessions(token_hash,created_at,expires_at) VALUES(?,?,?)').run(sha(token),now(),expiry); audit('login_success');
    return json(res,200,{ok:true},{'Set-Cookie':`roarnet_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${process.env.NODE_ENV==='production'?'; Secure':''}`});
   }
-  if(req.method==='POST' && url.pathname==='/api/logout') { const c=cookies(req).roarnet_session;if(c)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha(c));return json(res,200,{ok:true},{'Set-Cookie':`roarnet_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${process.env.NODE_ENV==='production'?'; Secure':''}`}); }
+  if(req.method==='POST' && url.pathname==='/api/logout') { const c=cookies(req).roarnet_session;if(c)db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha(c));return json(res,200,{ok:true},{'Set-Cookie':'roarnet_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'}); }
   if(url.pathname.startsWith('/api/')) {
    if(!requireAuth(req,res)) return;
+   if(req.method==='GET' && url.pathname==='/api/provider/settings') { const p=providerConfig(); return json(res,200,{name:p.name,apiBase:p.base,deviceId:p.deviceId,hasApiKey:!!p.apiKey,hasDeviceToken:!!p.token,configured:p.configured,enabled:p.enabled}); }
+   if(req.method==='POST' && url.pathname==='/api/provider/settings') {
+    const b=await readBody(req); const name=String(b.name||'').trim().slice(0,80); const apiBase=String(b.apiBase||'').trim().replace(/\/$/,''); const deviceId=String(b.deviceId||'').trim().slice(0,200); const apiKey=String(b.apiKey||'').trim(); const token=String(b.deviceToken||'').trim();
+    if(!name || !/^https:\/\//i.test(apiBase) || apiBase.length>300 || !deviceId) return json(res,400,{error:'أدخل اسم المزوّد ورابط API رسمي يبدأ بـ HTTPS ومعرّف الجهاز'});
+    try { const host=new URL(apiBase).hostname.toLowerCase(); if(host==='localhost'||host.endsWith('.local')||/^127\./.test(host)||/^10\./.test(host)||/^192\.168\./.test(host)) return json(res,400,{error:'رابط API المحلي غير مسموح'}); } catch { return json(res,400,{error:'رابط API غير صالح'}); }
+    const old=providerConfig(); if((!apiKey&&!old.apiKey)||(!token&&!old.token)) return json(res,400,{error:'أدخل مفتاح API ورمز الجهاز اللذين يمنحهما المزوّد'});
+    try { const values={name,base:apiBase,deviceId}; if(apiKey)values.apiKey=apiKey;if(token)values.token=token; for(const [k,v] of Object.entries(values)) db.prepare('INSERT INTO app_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at').run(k,sealSetting(v),now()); audit('provider_settings_saved',name); return json(res,200,{ok:true,message:'حُفظت بيانات المزوّد مشفّرة على الخادم. الاتصال الحقيقي يبقى متوقفاً حتى تفعيل PROVIDER_ENABLED بعد اعتماد API الرسمي.'}); } catch(e) { return json(res,503,{error:e.message==='APP_ENCRYPTION_KEY_MISSING'?'أضف APP_ENCRYPTION_KEY بطول 32 حرفاً أو أكثر إلى إعدادات الخادم':'تعذّر حفظ إعدادات المزوّد'}); }
+   }
+
+   if(req.method==='GET' && url.pathname==='/api/developer-payouts') {
+    const rows=db.prepare('SELECT reference,method,amount_usd,destination,status,transfer_reference,created_at,paid_at FROM developer_payouts ORDER BY id DESC LIMIT 100').all();
+    const summary=db.prepare("SELECT COALESCE(SUM(amount_usd),0) AS total, COALESCE(SUM(CASE WHEN status='pending' THEN amount_usd ELSE 0 END),0) AS pending, COALESCE(SUM(CASE WHEN status='paid' THEN amount_usd ELSE 0 END),0) AS paid FROM developer_payouts").get();
+    return json(res,200,{payouts:rows,summary:{
+      requestedUsd:Number(summary.total.toFixed(2)),
+      pendingUsd:Number(summary.pending.toFixed(2)),
+      paidUsd:Number(summary.paid.toFixed(2))
+    }});
+   }
+   if(req.method==='POST' && url.pathname==='/api/developer-payouts') {
+    const b=await readBody(req);
+    const method=String(b.method||'');
+    const destination=String(b.destination||'').trim();
+    const amount=Number(b.amount);
+    if(!['usdt_trc20','zain_cash'].includes(method)) return json(res,400,{error:'اختر USDT TRC20 أو زين كاش'});
+    if(!Number.isFinite(amount)||amount<=0||amount>1000000) return json(res,400,{error:'المبلغ غير صالح'});
+    if(destination.length<6||destination.length>160) return json(res,400,{error:'بيانات الاستلام غير صالحة'});
+    if(method==='usdt_trc20' && !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(destination)) return json(res,400,{error:'عنوان TRC20 غير مطابق للصيغة المعتادة'});
+    const ref='devpayout_'+crypto.randomUUID();
+    db.prepare("INSERT INTO developer_payouts(reference,method,amount_usd,destination,status,created_at) VALUES(?,?,?,?,'pending',?)").run(ref,method,Number(amount.toFixed(2)),destination,now());
+    audit('developer_payout_requested',ref);
+    return json(res,202,{ok:true,reference:ref,status:'pending',message:'سُجل طلب الاستلام للمراجعة؛ لم يتم تحويل أي أموال.'});
+   }
+   if(req.method==='POST' && url.pathname==='/api/admin/developer-payouts/mark-paid') {
+    const b=await readBody(req);
+    const reference=String(b.reference||'').trim();
+    const transferReference=String(b.transferReference||'').trim();
+    if(!/^devpayout_[0-9a-f-]{36}$/i.test(reference)||transferReference.length<4||transferReference.length>160) return json(res,400,{error:'أدخل مرجع الطلب ومرجع التحويل الفعلي'});
+    const row=db.prepare("SELECT status FROM developer_payouts WHERE reference=?").get(reference);
+    if(!row) return json(res,404,{error:'الطلب غير موجود'});
+    if(row.status!=='pending') return json(res,409,{error:'الطلب ليس معلقاً'});
+    let result;
+    try {
+     result=db.prepare("UPDATE developer_payouts SET status='paid',transfer_reference=?,paid_at=? WHERE reference=? AND status='pending'").run(transferReference,now(),reference);
+    } catch (e) {
+     if (e.errcode === 2067 || e.code === 'SQLITE_CONSTRAINT_UNIQUE' || e.code === 'SQLITE_CONSTRAINT') {
+      return json(res,409,{error:'مرجع التحويل مستخدم مسبقاً لطلب آخر'});
+     }
+     throw e;
+    }
+    if(Number(result.changes)!==1) return json(res,409,{error:'تغيرت حالة الطلب؛ حدّث الصفحة'});
+    audit('developer_payout_marked_paid',reference);
+    return json(res,200,{ok:true,message:'تم تحديث السجل إلى مدفوع. تأكد يدوياً من وصول التحويل قبل استخدام هذا الإجراء.'});
+   }
+
+   if(req.method==='POST' && url.pathname==='/api/admin/withdrawals/update') {
+    const b=await readBody(req);
+    const reference=String(b.reference||'').trim();
+    const action=String(b.action||'').trim();
+    const transferReference=String(b.transferReference||'').trim();
+
+    if(!/^withdrawal_[0-9a-f-]{36}$/i.test(reference)) {
+     return json(res,400,{error:'مرجع طلب السحب غير صالح'});
+    }
+    if(!['paid','rejected'].includes(action)) {
+     return json(res,400,{error:'الحالة المطلوبة غير صالحة'});
+    }
+    if(action==='paid' && (transferReference.length<4 || transferReference.length>160)) {
+     return json(res,400,{error:'أدخل مرجع التحويل الفعلي'});
+    }
+    if(action==='rejected' && transferReference) {
+     return json(res,400,{error:'لا يُقبل مرجع تحويل لطلب مرفوض'});
+    }
+
+    try {
+     db.exec('BEGIN IMMEDIATE');
+     const result=db.prepare(`
+      UPDATE ledger
+      SET status=?,
+          transfer_reference=?
+      WHERE reference=?
+        AND kind='payout_request'
+        AND status='pending'
+     `).run(action,action==='paid'?transferReference:null,reference);
+     const changes=Number(result.changes);
+     if(changes!==1) {
+      db.exec('ROLLBACK');
+      return json(res,409,{error:'الطلب غير موجود أو لم يعد معلقاً'});
+     }
+     audit(action==='paid'?'withdrawal_marked_paid':'withdrawal_rejected',reference);
+     db.exec('COMMIT');
+     return json(res,200,{
+      ok:true,
+      reference,
+      status:action,
+      totals:totals(),
+      message:action==='paid'
+       ? 'تم تحديث السجل إلى مدفوع؛ تحقق يدوياً من وصول التحويل.'
+       : 'تم رفض الطلب وتحرير المبلغ المحجوز.'
+     });
+    } catch(e) {
+     try { db.exec('ROLLBACK'); } catch {}
+     if(e.errcode===2067) {
+      return json(res,409,{error:'مرجع التحويل مستخدم في طلب آخر'});
+     }
+     throw e;
+    }
+   }
+
    if(req.method==='GET' && url.pathname==='/api/dashboard') {
     const latest=db.prepare('SELECT provider,device_id,payload_json,created_at FROM provider_snapshots ORDER BY id DESC LIMIT 1').get();
     const ledger=db.prepare('SELECT kind,amount,currency,reference,status,source,created_at FROM ledger ORDER BY id DESC LIMIT 30').all();
-    return json(res,200,{totals:totals(),provider:{name:cfg.providerName,enabled:cfg.providerEnabled,accountLinked:!!(cfg.providerApiKey&&cfg.providerDeviceId),latestSnapshotAt:latest?.created_at||null},ledger});
+    return json(res,200,{totals:totals(),provider:{name:providerConfig().name,enabled:providerConfig().enabled,accountLinked:providerConfig().configured,latestSnapshotAt:latest?.created_at||null},ledger});
    }
    if(req.method==='POST' && url.pathname==='/api/demo-credit') {
     const b=await readBody(req);const amount=Number(b.amount);if(!Number.isFinite(amount)||amount<=0||amount>1)return json(res,400,{error:'المبلغ التجريبي يجب أن يكون بين 0 و1 USD'});
@@ -90,29 +272,37 @@ const server=http.createServer(async(req,res)=>{
    if(req.method==='POST' && url.pathname==='/api/provider/refresh') {
     try {
      // Confirm endpoint names and token format with provider before enabling this adapter in production.
-     const payload=await providerGet(`/v1/peer/agents/${encodeURIComponent(cfg.providerDeviceId)}/earnings`);
+     const payload=await providerGet(`/v1/peer/agents/${encodeURIComponent(providerConfig().deviceId)}/earnings`);
      const reference=String(payload.reference||payload.transactionId||'');
-     db.prepare('INSERT INTO provider_snapshots(provider,device_id,payload_json,created_at) VALUES(?,?,?,?)').run(cfg.providerName,cfg.providerDeviceId,JSON.stringify(payload).slice(0,100000),now());
+     db.prepare('INSERT INTO provider_snapshots(provider,device_id,payload_json,created_at) VALUES(?,?,?,?)').run(providerConfig().name,providerConfig().deviceId,JSON.stringify(payload).slice(0,100000),now());
      // Never create a confirmed cash ledger entry without a provider-issued unique earning/settlement reference.
      if(reference && Number.isFinite(Number(payload.confirmedUsd)) && Number(payload.confirmedUsd)>=0) {
       const exists=db.prepare('SELECT id FROM ledger WHERE reference=?').get(`provider:${reference}`);
-      if(!exists) db.prepare("INSERT INTO ledger(kind,amount,currency,reference,status,source,created_at) VALUES('provider_confirmed',?,'USD',?,'confirmed',?,?)").run(Number(payload.confirmedUsd),`provider:${reference}`,cfg.providerName,now());
+      if(!exists) db.prepare("INSERT INTO ledger(kind,amount,currency,reference,status,source,created_at) VALUES('provider_confirmed',?,'USD',?,'confirmed',?,?)").run(Number(payload.confirmedUsd),`provider:${reference}`,providerConfig().name,now());
      }
      audit('provider_refresh_success',cfg.providerName);return json(res,200,{ok:true,message:'تم تحديث لقطة المزوّد؛ راجع تفاصيله قبل اعتماد أي رصيد.',totals:totals()});
     } catch(e) { audit('provider_refresh_failed',e.message);return json(res,503,{error:'تعذر تحديث بيانات المزوّد',detail:e.message==='PROVIDER_NOT_CONFIGURED'?'أكمل حساب الشراكة والمفاتيح أولاً':'تحقق من API والاعتماد الرسمي'}); }
    }
    if(req.method==='POST' && url.pathname==='/api/withdrawals') {
     const b=await readBody(req);const amount=Number(b.amount);const wallet=String(b.wallet||'').trim();
-    const t=totals(); const available=Math.max(0,t.confirmedUsd-t.pendingPayoutUsd);
-    if(!Number.isFinite(amount)||amount<=0||amount>available)return json(res,400,{error:'المبلغ يتجاوز الرصيد المؤكد المتاح أو غير صالح'});
+    const balance=totals();
+    const available=Math.max(0,balance.confirmedUsd-balance.pendingPayoutUsd);
+    if(!Number.isFinite(amount)||amount<=0||amount>available)return json(res,400,{error:'المبلغ يتجاوز الرصيد المتاح بعد احتساب طلبات السحب المعلقة أو غير صالح'});
     if(wallet.length<20||wallet.length>120)return json(res,400,{error:'أدخل عنوان محفظة صالحاً'});
     if(cfg.payoutsEnabled) return json(res,503,{error:'تنفيذ السحب الآلي يحتاج تكامل دفع تمت مراجعته. لم تُرسل أي معاملة.'});
-    const ref=`withdrawal_${crypto.randomUUID()}`;db.prepare("INSERT INTO ledger(kind,amount,currency,reference,status,source,created_at) VALUES('payout_request',?,'USDT',?,'pending',?,?)").run(-amount,ref,`manual_review_wallet:${wallet.slice(0,6)}…${wallet.slice(-4)}`,now());audit('withdrawal_requested',ref);
+    const ref=`withdrawal_${crypto.randomUUID()}`;db.prepare("INSERT INTO ledger(kind,amount,currency,reference,status,source,created_at) VALUES('payout_request',?,'USD',?,'pending',?,?)").run(-amount,ref,`manual_review_wallet:${wallet.slice(0,6)}…${wallet.slice(-4)}`,now());audit('withdrawal_requested',ref);
     return json(res,202,{ok:true,reference:ref,status:'pending_review',message:'سُجّل الطلب للمراجعة فقط. لم يتم إرسال USDT.'});
    }
    return json(res,404,{error:'مسار API غير موجود'});
   }
-  if(req.method==='GET' && url.pathname==='/') {res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'",'Referrer-Policy':'no-referrer','X-Frame-Options':'DENY'});return res.end(fs.readFileSync(path.join(root,'public/index.html')));}
+  if(req.method==='GET' && url.pathname==='/') {
+   res.writeHead(200,{
+    'Content-Type':'text/html; charset=utf-8',
+    'Cache-Control':'no-store',
+    ...securityHeaders
+   });
+   return res.end(fs.readFileSync(path.join(root,'public/index.html')));
+  }
   if(req.method==='GET' && url.pathname==='/favicon.ico'){res.writeHead(204);return res.end();}
   return json(res,404,{error:'غير موجود'});
  } catch(e) { if(!res.headersSent)json(res,e.message==='BAD_JSON'?400:500,{error:e.message==='BAD_JSON'?'صيغة البيانات غير صحيحة':'حدث خطأ داخلي'}); }
