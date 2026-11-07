@@ -27,10 +27,17 @@ import java.io.IOException;
 import java.net.URL;
 import java.security.SecureRandom;
 import org.json.JSONObject;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.rewarded.RewardedAd;
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 
 public class MainActivity extends Activity {
     private static final String LOCAL_URL = "http://127.0.0.1:3180/";
     private WebView web;
+    private RewardedAd rewardedAd;
+    private static final String ADMOB_AD_UNIT = "ca-app-pub-9782709035691744/3906285447";
     private String pendingAuthCode;
 
     private native int startNode(
@@ -47,6 +54,8 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        MobileAds.initialize(this, status -> {});
+        loadRewardedAd();
         captureAuthCode(getIntent());
         showMessage("🦁 RoarNet", "جاري تشغيل خادم RoarNet المحلي...");
 
@@ -558,6 +567,7 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new RoarNetAdminBridge(), "RoarNetAdmin");
         web.addJavascriptInterface(new RoarNetRelayBridge(), "RoarNetRelay");
         web.addJavascriptInterface(new RoarNetProxiesSDKBridge(), "RoarNetProxiesSDK");
+        web.addJavascriptInterface(new AndroidAdBridge(), "AndroidAd");
         web.setBackgroundColor(Color.rgb(16, 24, 39));
         // /ROARNET_WEBVIEW_LOCAL_ONLY_V1
         setContentView(web);
@@ -675,5 +685,31 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+
+    // ===== AdMob Rewarded - RoarNet =====
+    private void loadRewardedAd() {
+        AdRequest adRequest = new AdRequest.Builder().build();
+        RewardedAd.load(this, ADMOB_AD_UNIT, adRequest, new RewardedAdLoadCallback() {
+            @Override public void onAdFailedToLoad(LoadAdError err) { rewardedAd = null; }
+            @Override public void onAdLoaded(RewardedAd ad) { rewardedAd = ad; }
+        });
+    }
+    private void showRewardedAd() {
+        runOnUiThread(() -> {
+            if (rewardedAd != null) {
+                rewardedAd.show(MainActivity.this, reward -> {
+                    rewardedAd = null;
+                    loadRewardedAd();
+                    if (web != null) web.evaluateJavascript("javascript:onAdRewarded()", null);
+                });
+            } else {
+                loadRewardedAd();
+                if (web != null) web.evaluateJavascript("javascript:onAdRewarded()", null);
+            }
+        });
+    }
+    public class AndroidAdBridge {
+        @JavascriptInterface public void showRewarded() { showRewardedAd(); }
     }
 }
