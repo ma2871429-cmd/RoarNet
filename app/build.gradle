@@ -36,6 +36,18 @@ android {
         }
     }
 
+    buildTypes {
+        debug {
+            buildConfigField "String", "ADMOB_BANNER_AD_UNIT",
+                    "\"ca-app-pub-3940256099942544/9214589741\""
+        }
+
+        release {
+            buildConfigField "String", "ADMOB_BANNER_AD_UNIT",
+                    "\"ca-app-pub-9782709035691744/5427872796\""
+        }
+    }
+
     externalNativeBuild {
         cmake {
             path file('CMakeLists.txt')

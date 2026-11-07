@@ -2894,46 +2894,7 @@ document.getElementById('rn-withdraw-submit')
 <!-- END ROARNET_WITHDRAWAL_UI_V1 -->
 
 
-<!-- ===== RoarNet AdMob Rewarded - TEST MODE ===== -->
-<div id="rn-reward" style="margin:20px auto;max-width:760px;background:#091d32;border:1px solid #164b62;border-radius:16px;padding:18px;text-align:center">
-  <div style="font-size:22px;font-weight:800">🦁 اختبار إعلانات RoarNet</div>
-  <div style="color:#9bb7c9;margin:8px 0">
-    الإعلان تجريبي من Google. نظام Coins ومكافأة 1 GB غير مفعّلين عبر الإعلان حالياً.
-  </div>
-  <button id="rn-watch-ad" onclick="watchRewardAd()" style="background:#13dfd0;color:#04101f;border:0;border-radius:12px;padding:12px 22px;font-size:17px;font-weight:800;cursor:pointer">
-    ▶️ مشاهدة إعلان تجريبي
-  </button>
-  <div id="rn-ad-msg" role="status" aria-live="polite" style="color:#9bb7c9;margin-top:10px;font-size:14px">
-    جارٍ تجهيز الإعلان التجريبي...
-  </div>
-</div>
-<script>
-let rnAdRequestPending = false;
 
-function onAdStatus(message) {
-  const el = document.getElementById('rn-ad-msg');
-  if (el) el.textContent = String(message || '');
-  rnAdRequestPending = false;
-}
-
-function watchRewardAd() {
-  const el = document.getElementById('rn-ad-msg');
-
-  if (rnAdRequestPending) {
-    if (el) el.textContent = 'طلب الإعلان قيد المعالجة.';
-    return;
-  }
-
-  if (!window.AndroidAd || typeof window.AndroidAd.showRewarded !== 'function') {
-    if (el) el.textContent = 'ميزة الإعلانات متاحة داخل تطبيق Android فقط.';
-    return;
-  }
-
-  rnAdRequestPending = true;
-  if (el) el.textContent = 'جارٍ طلب الإعلان التجريبي...';
-  window.AndroidAd.showRewarded();
-}
-</script>
 
 </body>
 </html>
