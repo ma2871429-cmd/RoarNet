@@ -48,7 +48,7 @@ jobs:
 
       - name: Install Android SDK 35 and matching NDK
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
 
       - name: Download and stage Node.js Mobile
         env:

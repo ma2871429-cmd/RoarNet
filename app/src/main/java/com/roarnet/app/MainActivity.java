@@ -329,6 +329,56 @@ private final class RoarNetProxiesSDKBridge {
 
     }
 
+
+    // ROARNET_DIAGNOSTIC_SPIDER_V1
+    private String sanitizeDiagnostic(String value) {
+        if (value == null) return "";
+        String safe = value.length() > 1200
+            ? value.substring(0, 1200) : value;
+
+        safe = safe.replaceAll(
+            "(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
+            "[EMAIL]"
+        );
+        safe = safe.replaceAll(
+            "(?i)(bearer\\s+)[A-Za-z0-9._~+/=-]+",
+            "$1[REDACTED]"
+        );
+        safe = safe.replaceAll(
+            "(?i)(access_token|refresh_token|code|token|apikey|api_key)=([^&\\s]+)",
+            "$1=[REDACTED]"
+        );
+        safe = safe.replaceAll(
+            "\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b",
+            "[JWT_REDACTED]"
+        );
+        safe = safe.replaceAll(
+            "(?i)sb_publishable_[A-Za-z0-9_-]+",
+            "[PUBLIC_KEY_REDACTED]"
+        );
+        return safe;
+    }
+
+    private final class RoarNetDiagnosticsBridge {
+        @JavascriptInterface
+        public void capture(
+                String level, String source, String message, int line) {
+            String safeSource = sanitizeDiagnostic(source);
+            String safeMessage = sanitizeDiagnostic(message);
+
+            String entry = "source=" + safeSource
+                + " | line=" + line
+                + " | " + safeMessage;
+
+            if ("WARN".equalsIgnoreCase(level)) {
+                android.util.Log.w("RoarNetSpider", entry);
+            } else {
+                android.util.Log.e("RoarNetSpider", entry);
+            }
+        }
+    }
+    // /ROARNET_DIAGNOSTIC_SPIDER_V1
+
     // ROARNET_ANDROID_ADMIN_BRIDGE_V1
     private final class RoarNetAdminBridge {
         @JavascriptInterface
@@ -622,6 +672,32 @@ private final class RoarNetProxiesSDKBridge {
             }
 
             @Override
+            public void onReceivedError(
+                    WebView view,
+                    android.webkit.WebResourceRequest request,
+                    android.webkit.WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                android.util.Log.e(
+                    "RoarNetWebView",
+                    "Load error: " + sanitizeDiagnostic(String.valueOf(error.getDescription()))
+                        + " | URL: " + sanitizeDiagnostic(request.getUrl().toString())
+                );
+            }
+
+            @Override
+            public void onReceivedHttpError(
+                    WebView view,
+                    android.webkit.WebResourceRequest request,
+                    android.webkit.WebResourceResponse response) {
+                super.onReceivedHttpError(view, request, response);
+                android.util.Log.e(
+                    "RoarNetWebView",
+                    "HTTP error: " + response.getStatusCode()
+                        + " | URL: " + sanitizeDiagnostic(request.getUrl().toString())
+                );
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 deliverPendingAuthCode();
@@ -643,6 +719,22 @@ private final class RoarNetProxiesSDKBridge {
             }
         });
 
+        // ROARNET_WEBVIEW_DIAGNOSTICS_V1
+        web.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(
+                    android.webkit.ConsoleMessage message) {
+                android.util.Log.e(
+                    "RoarNetWebView",
+                    sanitizeDiagnostic(message.message())
+                        + " | line: " + message.lineNumber()
+                        + " | source: " + sanitizeDiagnostic(message.sourceId())
+                );
+                return true;
+            }
+        });
+
+        web.addJavascriptInterface(new RoarNetDiagnosticsBridge(), "RoarNetDiagnosticsBridge");
         web.addJavascriptInterface(new RoarNetAdminBridge(), "RoarNetAdmin");
         web.addJavascriptInterface(new RoarNetRelayBridge(), "RoarNetRelay");
         web.addJavascriptInterface(new RoarNetProxiesSDKBridge(), "RoarNetProxiesSDK");

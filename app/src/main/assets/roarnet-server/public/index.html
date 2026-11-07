@@ -1186,6 +1186,43 @@ const supabase = createClient(
   }
 );
 
+// ROARNET_DIAGNOSTIC_SPIDER_V1
+window.RoarNetDiagnostics = {
+  capture(level, source, message, line) {
+    try {
+      if (window.RoarNetDiagnosticsBridge) {
+        window.RoarNetDiagnosticsBridge.capture(
+          String(level || 'ERROR').slice(0, 12),
+          String(source || 'JavaScript').slice(0, 180),
+          String(message || 'Unknown error').slice(0, 1200),
+          Number(line) || 0
+        );
+      }
+    } catch (_) {}
+  }
+};
+
+window.addEventListener('error', event => {
+  window.RoarNetDiagnostics.capture(
+    'ERROR',
+    event.filename || 'JavaScript',
+    event.message || 'Window error',
+    event.lineno || 0
+  );
+});
+
+window.addEventListener('unhandledrejection', event => {
+  const reason = event.reason;
+  window.RoarNetDiagnostics.capture(
+    'ERROR',
+    'Unhandled Promise',
+    reason?.message || reason?.name || String(reason || 'Promise rejected'),
+    0
+  );
+});
+// /ROARNET_DIAGNOSTIC_SPIDER_V1
+
+
 window.RoarNetHandleAuthCode = async function(code) {
   const status = document.getElementById('rn-auth-status');
   status.textContent = 'جارٍ إكمال تسجيل الدخول داخل التطبيق...';
@@ -1620,14 +1657,29 @@ document.getElementById('rn-wallet-device-select')
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   statusBox.textContent = 'جارٍ إرسال رابط الدخول...';
+
   const email = document.getElementById('rn-auth-email').value.trim();
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: 'roarnet://auth-callback' }
-  });
-  statusBox.textContent = error
-    ? 'تعذّر إرسال الرابط: ' + error.message
-    : 'إذا كان البريد صالحاً، ستصلك رسالة تحتوي رابط تسجيل الدخول.';
+
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: 'roarnet://auth-callback' }
+    });
+
+    if (error) throw error;
+
+    statusBox.textContent =
+      'إذا كان البريد صالحاً، ستصلك رسالة تحتوي رابط تسجيل الدخول.';
+  } catch (error) {
+    window.RoarNetDiagnostics?.capture(
+      'ERROR', 'Supabase Login',
+      error?.message || error?.name || 'Login request failed', 0
+    );
+
+    statusBox.textContent =
+      'تعذّر إرسال رابط الدخول: ' +
+      (error?.message || 'حدث خطأ في الاتصال. حاول مجدداً.');
+  }
 });
 
 supabase.auth.onAuthStateChange((_event, session) => {
