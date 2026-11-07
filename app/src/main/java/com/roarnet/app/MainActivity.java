@@ -327,6 +327,8 @@ private final class RoarNetProxiesSDKBridge {
         }
     }
 
+    }
+
     // ROARNET_ANDROID_ADMIN_BRIDGE_V1
     private final class RoarNetAdminBridge {
         @JavascriptInterface
