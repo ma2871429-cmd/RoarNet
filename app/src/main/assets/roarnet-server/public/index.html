@@ -1,0 +1,2514 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="RoarNet — مشروع لتطوير حلول مشاركة موارد الإنترنت وإدارة الترافيك.">
+  <title>RoarNet — مشروع مشاركة الإنترنت</title>
+<style id="rn-redesign-v1">
+:root {
+  color-scheme: dark;
+  --rn-bg: #04101f;
+  --rn-panel: #091d32;
+  --rn-panel2: #0d2940;
+  --rn-line: #164b62;
+  --rn-text: #effaff;
+  --rn-muted: #9bb7c9;
+  --rn-cyan: #13dfd0;
+  --rn-blue: #13b7d8;
+}
+html { scroll-behavior: smooth; scroll-padding-top: 22px; }
+body {
+  display: block !important;
+  padding: 0 0 92px !important;
+  margin: 0 !important;
+  min-height: 100vh;
+  color: var(--rn-text) !important;
+  background:
+    radial-gradient(ellipse at 50% -15%, #123b57 0, transparent 55%),
+    var(--rn-bg) !important;
+  font-family: system-ui, -apple-system, "Noto Sans Arabic", sans-serif;
+}
+.rn-shell {
+  display: block;
+  width: min(100%, 760px) !important;
+  max-width: 760px !important;
+  margin: auto !important;
+  padding: 18px 17px 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  text-align: right !important;
+}
+.rn-topbar, .rn-brand, .rn-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rn-topbar { margin: 4px 0 34px; }
+.rn-brand {
+  justify-content: flex-start;
+  gap: 9px;
+  color: var(--rn-text);
+  font-size: 23px;
+  font-weight: 850;
+  text-decoration: none;
+}
+.rn-lion { font-size: 29px; }
+
+/* ROARNET_NEON_LION_ASSET_V1 */
+.rn-lion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rn-lion img {
+  display: block;
+  width: 39px;
+  height: 39px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 3px #13dfd0)
+    drop-shadow(0 0 8px #13dfd0)
+    drop-shadow(0 0 15px #08bddd99);
+}
+.rn-footer .rn-lion img {
+  width: 34px;
+  height: 34px;
+}
+.rn-pill .rn-lion-mark {
+  width: 19px;
+  height: 19px;
+  vertical-align: middle;
+  margin-left: 5px;
+  filter: drop-shadow(0 0 5px #13dfd0);
+}
+.rn-dashboard-icon .rn-lion-mark {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 4px #13dfd0)
+    drop-shadow(0 0 10px #13dfd0);
+}
+/* END ROARNET_NEON_LION_ASSET_V1 */
+
+.rn-accent { color: var(--rn-cyan); }
+.rn-avatar {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid var(--rn-line);
+  border-radius: 15px;
+  color: var(--rn-cyan);
+  background: var(--rn-panel);
+  text-decoration: none;
+  font-size: 25px;
+}
+.rn-welcome { margin-bottom: 23px; }
+.rn-eyebrow {
+  color: var(--rn-cyan);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+.rn-welcome h1 { margin: 9px 0; font-size: clamp(26px, 6vw, 36px); }
+.rn-welcome p, .rn-hero p, .rn-card p, .rn-account-card p,
+.rn-footer p {
+  color: var(--rn-muted);
+  line-height: 1.9;
+  font-size: 14px;
+}
+.rn-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 25px 22px;
+  border: 1px solid #176078;
+  border-radius: 25px;
+  background: linear-gradient(135deg, #103b51, #09233a 65%, #07182b);
+  box-shadow: 0 16px 45px #0003;
+}
+.rn-hero-glow {
+  position: absolute;
+  width: 175px;
+  height: 175px;
+  left: -75px;
+  top: -65px;
+  border-radius: 50%;
+  background: #11dfd0;
+  filter: blur(85px);
+  opacity: .2;
+  pointer-events: none;
+}
+.rn-pill, .rn-live-dot {
+  display: inline-block;
+  padding: 7px 11px;
+  border: 1px solid #1c7180;
+  border-radius: 30px;
+  color: var(--rn-cyan);
+  background: #062334aa;
+  font-size: 11px;
+}
+.rn-hero h2 { position: relative; margin: 21px 0 8px; font-size: 26px; }
+.rn-hero p { position: relative; max-width: 430px; }
+.rn-primary, .rn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 19px;
+  margin-top: 12px;
+  border-radius: 13px;
+  background: linear-gradient(100deg, var(--rn-cyan), #08c7df);
+  color: #03202b !important;
+  font-weight: 800;
+  font-size: 14px;
+  text-decoration: none;
+}
+.rn-orbit {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  height: 86px;
+  border: 1px solid #18c8d977;
+  border-radius: 50%;
+  color: #24dce0;
+  font-size: 52px;
+  font-weight: 900;
+  opacity: .17;
+}
+.rn-section { margin-top: 32px; }
+.rn-section-heading { margin-bottom: 15px; }
+.rn-section-heading h2, .rn-account-card h2 {
+  margin: 5px 0;
+  font-size: 21px;
+}
+.rn-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rn-card {
+  min-width: 0;
+  padding: 18px 15px;
+  border: 1px solid var(--rn-line);
+  border-radius: 20px;
+  background: linear-gradient(150deg, #0b2940, #07192c);
+}
+.rn-card-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: var(--rn-cyan);
+  background: #0c4052;
+  font-size: 25px;
+}
+.rn-card h3 { margin: 14px 0 5px; font-size: 16px; }
+.rn-card p { margin: 7px 0 15px; font-size: 12px; }
+.rn-card-foot { color: var(--rn-cyan); font-size: 11px; }
+.rn-account-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  padding: 19px;
+  border: 1px solid var(--rn-line);
+  border-radius: 20px;
+  background: var(--rn-panel);
+}
+.rn-account-card > div { flex: 1; min-width: 160px; }
+.rn-account-card p { margin: 5px 0; }
+.rn-secondary { margin: 0; padding: 10px 13px; font-size: 12px; }
+.rn-footer { padding: 28px 5px 10px; text-align: center; }
+.rn-footer .rn-brand { justify-content: center; }
+.rn-footer p { font-size: 12px; }
+.rn-footer > a {
+  margin-top: 5px;
+  color: var(--rn-cyan);
+  background: transparent;
+  padding: 8px;
+}
+#rn-revenue, #rn-auth {
+  width: min(100% - 34px, 726px) !important;
+  max-width: 726px !important;
+  margin: 28px auto !important;
+  padding: 21px 17px !important;
+  border: 1px solid var(--rn-line);
+  border-radius: 22px;
+  background: linear-gradient(150deg, #0a2035, #071526);
+  color: var(--rn-text);
+}
+#rn-revenue .rn-intro { text-align: right; }
+#rn-revenue .rn-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+#rn-revenue .rn-card { border-color: var(--rn-line); background: var(--rn-panel); }
+#rn-revenue .rn-note { background: #0b2b40; line-height: 1.9; }
+#rn-auth { text-align: right !important; }
+#rn-auth h2 { color: var(--rn-text); }
+#rn-auth input {
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0;
+  border: 1px solid var(--rn-line) !important;
+  border-radius: 12px !important;
+  color: var(--rn-text);
+  background: #041426;
+  font: inherit;
+}
+#rn-auth button {
+  padding: 12px 17px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--rn-cyan);
+  color: #03202b;
+  font: inherit;
+  font-weight: 800;
+}
+#rn-auth p { overflow-wrap: anywhere; }
+#roarnet-adsterra-banner { margin: 22px auto !important; }
+.rn-bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 2px;
+  border-radius: 12px;
+  color: var(--rn-muted);
+  background: transparent;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 650;
+}
+.rn-bottom-nav a span { font-size: 20px; }
+.rn-bottom-nav a.active { color: var(--rn-cyan); background: #0c3448; }
+@media (max-width: 390px) {
+  .rn-shell { padding-right: 13px !important; padding-left: 13px !important; }
+  .rn-hero { padding: 21px 17px; }
+  .rn-orbit { left: 12px; width: 60px; height: 60px; font-size: 38px; }
+  .rn-card { padding: 15px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+</style>
+
+
+<style id="ROARNET_PREMIUM_UI_V1">
+:root {
+  color-scheme: dark;
+  --rn-bg: #07111f;
+  --rn-panel: #101e31;
+  --rn-panel2: #142840;
+  --rn-cyan: #35d5e8;
+  --rn-blue: #368bff;
+  --rn-text: #f1f7ff;
+  --rn-muted: #91a7bd;
+  --rn-border: rgba(93,190,220,.17);
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--rn-bg);
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% -15%, rgba(35,137,190,.23), transparent 48%),
+    linear-gradient(180deg,#07111f 0%,#091626 55%,#07111f 100%) !important;
+  color: var(--rn-text) !important;
+  font-family: system-ui, "Noto Sans Arabic", sans-serif !important;
+  padding-bottom: 100px !important;
+}
+
+section:not(#rn-traffic),
+#rn-auth,
+#rn-wallet,
+#rn-revenue,
+#rn-admin-link-code,
+#rn-admin-finance {
+  border-color: var(--rn-border) !important;
+  border-radius: 22px !important;
+}
+
+h1,h2,h3,h4 {
+  color: var(--rn-text);
+  letter-spacing: -.35px;
+}
+
+p,small,label {
+  color: var(--rn-muted);
+}
+
+input,select,textarea {
+  box-sizing: border-box !important;
+  max-width: 100%;
+  border: 1px solid var(--rn-border) !important;
+  border-radius: 13px !important;
+  background: #091727 !important;
+  color: var(--rn-text) !important;
+  outline: none;
+}
+
+input:focus,select:focus,textarea:focus {
+  border-color: var(--rn-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(53,213,232,.10);
+}
+
+button {
+  border-radius: 13px !important;
+  cursor: pointer;
+  transition: transform .18s ease, filter .18s ease;
+}
+
+button:active {
+  transform: scale(.97);
+}
+
+a {
+  color: var(--rn-cyan);
+}
+
+.rn-bottom-nav {
+  position: fixed !important;
+  z-index: 9999 !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  left: 0 !important;
+  right: 0 !important;
+  transform: none !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: min(calc(100% - 16px), 720px) !important;
+  max-width: 720px;
+  margin: 0 !important;
+  padding: 15px 12px !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  gap: 5px !important;
+  border: 1px solid rgba(77,190,220,.22) !important;
+  border-radius: 22px !important;
+  background: rgba(10,25,42,.94) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  backdrop-filter: blur(18px);
+}
+
+.rn-bottom-nav a {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 4px !important;
+  border-radius: 13px !important;
+  color: #91a7bd !important;
+  text-align: center;
+  text-decoration: none !important;
+  font-size: 12px !important;
+}
+
+.rn-bottom-nav a span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 26px;
+}
+
+.rn-bottom-nav a.active {
+  color: var(--rn-cyan) !important;
+  background: rgba(53,213,232,.10) !important;
+}
+
+#rn-traffic,
+.rn-bottom-nav a[href="#rn-traffic"] {
+  display: none !important;
+}
+
+#rn-auth,
+#rn-wallet,
+#rn-revenue,
+#rn-admin-link-code,
+#rn-admin-finance {
+  background: linear-gradient(145deg,#12243a,#0c192a) !important;
+  border: 1px solid var(--rn-border) !important;
+  box-shadow: 0 12px 35px rgba(0,0,0,.18);
+}
+
+#rn-wallet-amount {
+  color: var(--rn-cyan);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+#rn-finance-summary > div {
+  border: 1px solid var(--rn-border);
+  border-radius: 16px;
+  background: linear-gradient(145deg,#172d45,#102036) !important;
+}
+
+/* ROARNET_DASHBOARD_V1 */
+#rn-dashboard { margin-top: 28px; }
+.rn-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.rn-dashboard-card {
+  position: relative;
+  display: flex;
+  min-height: 145px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--rn-border);
+  border-radius: 19px;
+  color: var(--rn-text) !important;
+  background: linear-gradient(145deg,#142b43,#0b1b2d);
+  text-decoration: none !important;
+  transition: transform .18s ease, border-color .18s ease;
+}
+.rn-dashboard-card:active { transform: scale(.98); }
+.rn-dashboard-wallet {
+  border-color: rgba(53,213,232,.42);
+  background: linear-gradient(145deg,#104052,#0b2237);
+}
+.rn-dashboard-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--rn-cyan);
+  background: rgba(53,213,232,.12);
+  font-size: 22px;
+}
+.rn-dashboard-label { color: var(--rn-cyan); font-size: 11px; }
+.rn-dashboard-card strong { font-size: 15px; }
+.rn-dashboard-card small { color: var(--rn-muted); font-size: 11px; line-height: 1.7; }
+.rn-dashboard-arrow { position: absolute; left: 15px; bottom: 13px; color: var(--rn-cyan); }
+.rn-dashboard-info { background: linear-gradient(145deg,#17263b,#101a2a); }
+#rn-public-stats { display: none !important; }
+@media (max-width: 360px) {
+  .rn-dashboard-grid { gap: 8px; }
+  .rn-dashboard-card { padding: 12px; }
+}
+/* END ROARNET_DASHBOARD_V1 */
+
+
+@media (max-width: 480px) {
+  body { padding-left: 12px; padding-right: 12px; }
+  #rn-admin-finance { padding: 14px !important; }
+}
+</style>
+
+
+<style id="roarnet-pro-design-v2">
+/* ROARNET_PRO_DESIGN_V2 */
+
+:root {
+  --rn-cyan: #13dfd0;
+  --rn-blue: #13b7d8;
+  --rn-bg: #040d19;
+  --rn-panel: #0a1c30;
+  --rn-panel2: #102941;
+  --rn-line: #1b5068;
+  --rn-text: #effaff;
+  --rn-muted: #9bb7c9;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% -15%, #123c50 0%, transparent 48%),
+    linear-gradient(160deg, #040d19, #07182a 60%, #04101f) !important;
+  color: var(--rn-text);
+}
+
+.rn-shell {
+  width: min(100% - 28px, 1120px) !important;
+  margin-inline: auto !important;
+}
+
+.rn-brand {
+  font-weight: 900 !important;
+  letter-spacing: .3px;
+}
+
+.rn-section {
+  scroll-margin-top: 85px;
+}
+
+.rn-section h2 {
+  font-weight: 850;
+  letter-spacing: -.4px;
+}
+
+.rn-dashboard-grid {
+  gap: 13px !important;
+}
+
+.rn-dashboard-card {
+  min-height: 125px;
+  border: 1px solid #1a536b !important;
+  border-radius: 19px !important;
+  background: linear-gradient(145deg, #102b43, #091a2d) !important;
+  box-shadow: 0 10px 28px #0005;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+
+.rn-dashboard-card:active {
+  transform: scale(.975);
+}
+
+.rn-dashboard-card:hover {
+  border-color: var(--rn-cyan) !important;
+  box-shadow: 0 0 20px #13dfd01c;
+}
+
+.rn-dashboard-label {
+  font-weight: 800 !important;
+}
+
+.rn-dashboard-info {
+  background: linear-gradient(145deg, #123a4b, #0b2034) !important;
+  border-color: #13b7d866 !important;
+}
+
+#rn-auth {
+  max-width: 760px !important;
+  width: calc(100% - 28px) !important;
+  margin: 26px auto !important;
+  padding: 25px !important;
+  border: 1px solid #1b6074 !important;
+  border-radius: 23px !important;
+  background: linear-gradient(145deg, #102b43, #091a2d) !important;
+  box-shadow: 0 15px 40px #0005, 0 0 24px #13dfd00b;
+}
+
+#rn-auth h2,
+#rn-auth h3 {
+  font-weight: 850;
+}
+
+#rn-auth input,
+#rn-wallet input,
+#rn-wallet select,
+#roarnet-withdrawal-panel input {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: 47px;
+  padding: 12px 14px !important;
+  border: 1px solid #28566c !important;
+  border-radius: 12px !important;
+  background: #071a2b !important;
+  color: #effaff !important;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+#rn-auth input:focus,
+#rn-wallet input:focus,
+#rn-wallet select:focus,
+#roarnet-withdrawal-panel input:focus {
+  border-color: var(--rn-cyan) !important;
+  box-shadow: 0 0 0 3px #13dfd022;
+}
+
+#rn-auth button,
+#rn-wallet button,
+#roarnet-withdrawal-panel button {
+  min-height: 43px;
+  border-radius: 12px !important;
+  font-weight: 800;
+  transition: filter .2s, transform .2s;
+}
+
+#rn-auth button:active,
+#rn-wallet button:active,
+#roarnet-withdrawal-panel button:active {
+  transform: scale(.98);
+}
+
+#rn-wallet:not([hidden]) {
+  display: block !important;
+  max-width: 900px !important;
+  width: calc(100% - 28px) !important;
+  margin: 24px auto !important;
+  padding: 24px !important;
+  border: 1px solid #1b6074 !important;
+  border-radius: 23px !important;
+  background: linear-gradient(145deg, #102b43, #091a2d) !important;
+  box-shadow: 0 15px 40px #0005;
+}
+
+#rn-wallet-finance {
+  border-color: #24566b !important;
+}
+
+#rn-wallet-finance small {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--rn-muted);
+  font-size: 12px;
+}
+
+#rn-wallet-finance strong {
+  font-weight: 900;
+  letter-spacing: -.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+#rn-wallet-months > div {
+  padding: 16px !important;
+  border: 1px solid #24566b !important;
+  border-radius: 16px !important;
+  background: linear-gradient(145deg, #102b43, #0a1d30) !important;
+  box-shadow: 0 7px 18px #0003;
+}
+
+#rn-revenue .rn-grid {
+  gap: 15px !important;
+}
+
+#rn-revenue .rn-card {
+  padding: 20px !important;
+  border: 1px solid #20536a !important;
+  border-radius: 19px !important;
+  background: linear-gradient(145deg, #102b43, #091a2d) !important;
+  box-shadow: 0 10px 25px #0004;
+}
+
+#rn-revenue .rn-card h3 {
+  font-weight: 850;
+}
+
+#rn-revenue .rn-tag {
+  border-radius: 30px;
+}
+
+#rn-revenue .rn-note {
+  border: 1px solid #1b5368;
+  border-radius: 15px;
+}
+
+#rn-public-stats {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin-block: 25px;
+}
+
+#rn-public-stats .rn-stat-value {
+  color: var(--rn-cyan) !important;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 15px #13dfd022;
+}
+
+#rn-public-stats .rn-stats-note {
+  color: var(--rn-muted);
+}
+
+.rn-bottom-nav {
+  border-top: 1px solid #1b5368 !important;
+  background: #061525f5 !important;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 -8px 30px #0005;
+}
+
+.rn-bottom-nav a {
+  border-radius: 13px !important;
+  transition: background .2s, color .2s;
+}
+
+.rn-bottom-nav a.active {
+  background: #0c3448 !important;
+  color: var(--rn-cyan) !important;
+}
+
+#roarnet-withdrawal-panel {
+  max-width: 900px;
+  width: calc(100% - 28px);
+  margin: 22px auto;
+  padding: 22px;
+  border: 1px solid #1b6074;
+  border-radius: 21px;
+  background: linear-gradient(145deg, #102b43, #091a2d);
+  box-shadow: 0 12px 30px #0004;
+}
+
+#rn-withdraw-list li {
+  padding: 11px;
+  margin-block: 8px;
+  border: 1px solid #24566b;
+  border-radius: 12px;
+  background: #0b2034;
+  overflow-wrap: anywhere;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 600px) {
+  .rn-shell {
+    width: calc(100% - 22px) !important;
+  }
+
+  #rn-auth,
+  #rn-wallet,
+  #roarnet-withdrawal-panel {
+    width: calc(100% - 22px) !important;
+    padding: 17px !important;
+    border-radius: 18px !important;
+  }
+
+  .rn-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #rn-wallet-finance {
+    padding-top: 15px;
+  }
+}
+
+/* END ROARNET_PRO_DESIGN_V2 */
+</style>
+
+</head>
+<body>
+
+<main id="rn-home" class="rn-shell">
+  <header class="rn-topbar">
+    <a class="rn-brand" href="#rn-home" aria-label="RoarNet الرئيسية">
+      <span class="rn-lion"><img src="data:image/png;base64,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" alt="RoarNet Lion"></span>
+      <span>Roar<span class="rn-accent">Net</span></span>
+    </a>
+    <a class="rn-avatar" href="#rn-auth" aria-label="الحساب">♙</a>
+  </header>
+
+  <section class="rn-welcome">
+    <span class="rn-eyebrow">CONNECT · EARN · GROW</span>
+    <h1>أهلاً بك في <span class="rn-accent">RoarNet</span></h1>
+    <p>منصتك لمتابعة مشاركة الإنترنت وتطوير شبكة أكثر ترابطاً.</p>
+  </section>
+
+  <section class="rn-hero">
+    <div class="rn-hero-glow"></div>
+    <span class="rn-pill"><img class="rn-lion-mark" src="data:image/png;base64,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" alt=""> شبكة RoarNet</span>
+    <h2>كل اتصال يبدأ بخطوة</h2>
+    <p>تابع حسابك، تعرّف على خدمات الشبكة، واستكشف التطورات القادمة.</p>
+    <a class="rn-primary" href="#rn-auth">ابدأ من حسابك <span>←</span></a>
+    <div class="rn-orbit" aria-hidden="true">R</div>
+  </section>
+
+  <section id="rn-dashboard" class="rn-section">
+    <div class="rn-section-heading">
+      <div>
+        <span class="rn-eyebrow">YOUR ROARNET SPACE</span>
+        <h2>لوحة التحكم</h2>
+      </div>
+      <span class="rn-live-dot">حسابك</span>
+    </div>
+
+    <div class="rn-dashboard-grid">
+      <a class="rn-dashboard-card rn-dashboard-wallet" href="#rn-wallet">
+        <span class="rn-dashboard-icon">◈</span>
+        <span class="rn-dashboard-label">المحفظة</span>
+        <strong>إدارة رصيدك</strong>
+        <small>الحركات المالية وطلبات السحب</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <a class="rn-dashboard-card" href="#rn-revenue">
+        <span class="rn-dashboard-icon">↗</span>
+        <span class="rn-dashboard-label">الإيرادات</span>
+        <strong>مصادر الدخل</strong>
+        <small>تفاصيل الإيرادات وآلية التوزيع</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <a class="rn-dashboard-card" href="#rn-auth">
+        <span class="rn-dashboard-icon">♙</span>
+        <span class="rn-dashboard-label">حسابي</span>
+        <strong>إدارة الحساب</strong>
+        <small>تسجيل الدخول ومعلومات الحساب</small>
+        <span class="rn-dashboard-arrow">←</span>
+      </a>
+
+      <div class="rn-dashboard-card rn-dashboard-info">
+        <span class="rn-dashboard-icon"><img class="rn-lion-mark" src="data:image/png;base64,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" alt="RoarNet"></span>
+        <span class="rn-dashboard-label">RoarNet</span>
+        <strong>مساحة نمو مشتركة</strong>
+        <small>تطوير الخدمات والميزات القادمة</small>
+      </div>
+    </div>
+  </section>
+
+  <section id="rn-traffic" class="rn-section">
+    <div class="rn-section-heading">
+      <div><span class="rn-eyebrow">NETWORK</span><h2>مركز الشبكة</h2></div>
+      <span class="rn-live-dot">● قيد التطوير</span>
+    </div>
+    <div class="rn-cards">
+      <article class="rn-card">
+        <span class="rn-card-icon">⌁</span>
+        <h3>مشاركة الإنترنت</h3>
+        <p>إدارة المشاركة تخضع لتوفر خدمة الربط الفعلية وموافقة المستخدم.</p>
+        <span class="rn-card-foot">خدمات الشبكة</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">◉</span>
+        <h3>قياس الترافيك</h3>
+        <p>تُعرض القياسات عند ربط مصدر البيانات والتحقق من أحداث الاستخدام.</p>
+        <span class="rn-card-foot">متابعة الاستخدام</span>
+      </article>
+    </div>
+  </section>
+
+  <section id="rn-public-stats" class="rn-section" aria-labelledby="rn-public-stats-title">
+    <div class="rn-section-heading">
+      <div>
+        <span class="rn-eyebrow">LIVE NETWORK DATA</span>
+        <h2 id="rn-public-stats-title">إحصائيات الشبكة</h2>
+      </div>
+      <span id="rn-stats-status" class="rn-live-dot" role="status">جارٍ التحديث...</span>
+    </div>
+    <div class="rn-cards">
+      <article class="rn-card">
+        <span class="rn-card-icon">♙</span>
+        <h3>المشاركون المسجلون</h3>
+        <p id="rn-stat-registered" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">إجمالي سجلات المشاركين</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">✓</span>
+        <h3>المشاركون الموافقون</h3>
+        <p id="rn-stat-consented" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">موافقة مشاركة سارية</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">↗</span>
+        <h3>زيارات الصفحة</h3>
+        <p id="rn-stat-visits" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">مرات فتح الصفحة الرئيسية</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">⇅</span>
+        <h3>ترافيك Relay المسجل</h3>
+        <p id="rn-stat-traffic" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">GB عشري · من أحداث Relay فقط</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">◉</span>
+        <h3>أحداث الترافيك</h3>
+        <p id="rn-stat-events" class="rn-stat-value">—</p>
+        <span class="rn-card-foot">عدد سجلات Relay</span>
+      </article>
+      <article class="rn-card">
+        <span class="rn-card-icon">⌁</span>
+        <h3>عناوين IP النشطة</h3>
+        <p id="rn-stat-ips" class="rn-stat-value">غير متاح</p>
+        <span class="rn-card-foot">آخر 24 ساعة · عند توفر إعداد موثوق</span>
+      </article>
+    </div>
+    <p id="rn-stats-note" class="rn-stats-note">
+      تُحدّث البيانات تلقائياً عند توفر اتصال بالخادم.
+    </p>
+  </section>
+
+  <section class="rn-section rn-account-card">
+    <span class="rn-card-icon">♙</span>
+    <div>
+      <h2>حسابك في RoarNet</h2>
+      <p>سجّل الدخول بالبريد الإلكتروني للوصول إلى ميزة الحساب الحالية.</p>
+    </div>
+    <a class="rn-secondary" href="#rn-auth">تسجيل الدخول ←</a>
+  </section>
+
+  <footer class="rn-footer">
+    <span class="rn-brand"><span class="rn-lion"><img src="data:image/png;base64,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" alt="RoarNet Lion"></span> Roar<span class="rn-accent">Net</span></span>
+    <p>نبني شبكة أكثر ترابطاً، خطوة بخطوة.</p>
+    <a href="https://github.com/ma2871429-cmd/RoarNet"
+       target="_blank" rel="noopener noreferrer">مشاهدة المشروع على GitHub</a>
+  </footer>
+</main>
+
+
+<!-- ROARNET_REVENUE_HUB_V1 -->
+<style>
+#rn-revenue {
+  direction:rtl;
+  text-align:right;
+  max-width:1100px;
+  margin:36px auto;
+  padding:24px 16px;
+  font-family:inherit;
+  color:inherit;
+}
+#rn-revenue .rn-intro {text-align:center;margin-bottom:24px}
+#rn-revenue .rn-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:16px;
+}
+#rn-revenue .rn-card {
+  padding:22px;
+  border:1px solid #8885;
+  border-radius:18px;
+  background:rgba(128,128,128,.06);
+}
+#rn-revenue .rn-card h3 {margin-top:0}
+#rn-revenue .rn-tag {
+  display:inline-block;
+  padding:5px 10px;
+  border:1px solid #8886;
+  border-radius:20px;
+  font-size:.85em;
+}
+#rn-revenue .rn-note {
+  margin-top:18px;
+  padding:14px;
+  border-radius:12px;
+  background:rgba(128,128,128,.09);
+  font-size:.95em;
+}
+#rn-revenue .rn-ad-slot {
+  min-height:90px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  border:1px dashed #8888;
+  border-radius:12px;
+  margin-top:14px;
+  padding:12px;
+}
+#rn-public-stats .rn-stat-value {
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 800;
+  color: var(--rn-cyan);
+  direction: ltr;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+#rn-public-stats .rn-stats-note {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: .8;
+}
+</style>
+
+<section id="rn-revenue" aria-labelledby="rn-revenue-title">
+  <div class="rn-intro">
+    <span class="rn-tag">RoarNet · مصادر الإيرادات</span>
+    <h2 id="rn-revenue-title">شبكة تنمو مع مستخدميها</h2>
+    <p>نعمل على تطوير مصادر دخل من خدمات الشبكة والإعلانات المؤهلة.</p>
+  </div>
+
+  <div class="rn-grid">
+    <article class="rn-card">
+      <h3>🌐 خدمات الشبكة للشركات</h3>
+      <p>
+        خدمات اتصال ونقل بيانات وفق احتياجات العملاء،
+        مع قياس الاستخدام القابل للتحقق واتفاق واضح على الأسعار.
+      </p>
+      <span class="rn-tag">إيرادات من العملاء</span>
+    </article>
+
+    <article class="rn-card">
+      <h3>📢 الإعلانات</h3>
+      <p>
+        مساحة مخصصة للإعلانات من مزود معتمد،
+        مع احترام خصوصية المستخدمين وشروط مزود الإعلانات.
+      </p>
+      <div id="rn-ad-slot" class="rn-ad-slot"
+           aria-label="مساحة إعلانية">
+        مساحة إعلانية — بانتظار ربط مزود الإعلانات
+      </div>
+    </article>
+  </div>
+
+  <div class="rn-note">
+    <strong>توزيع الإيرادات:</strong>
+    الخطة المحاسبية: 80% لمالك المشروع، و15% للمشاركين، و5% احتياطي تشغيل مستقل
+    من صافي الإيرادات القابلة للتوزيع، بعد التحقق من الإيرادات
+    واحتساب التكاليف وفق الاتفاق المعتمد.
+    <p>
+      الأرصدة التجريبية منفصلة عن الأرباح الفعلية،
+      وتُحتسب الأرباح الفعلية بعد تأكيد الإيرادات من مصادرها.
+    </p>
+  </div>
+</section>
+<!-- /ROARNET_REVENUE_HUB_V1 -->
+
+
+<!-- RoarNet Adsterra mobile banner 320x50 -->
+<div id="roarnet-adsterra-banner"
+     style="width:320px;max-width:100%;min-height:50px;margin:20px auto;text-align:center;overflow:hidden"
+     aria-label="مساحة إعلانية">
+  <script>
+    atOptions = {
+      'key': 'ee2af095a2b5972a5b6691bec44bbac2',
+      'format': 'iframe',
+      'height': 50,
+      'width': 320,
+      'params': {}
+    };
+  </script>
+  <script src="https://bauval.org/22/ee2af095a2b5972a5b6691bec44bbac2"></script>
+</div>
+<!-- End RoarNet Adsterra mobile banner -->
+
+
+<!-- ROARNET_SUPABASE_LOGIN_V1 -->
+<section id="rn-auth" style="max-width:520px;margin:30px auto;padding:22px;border:1px solid #34435b;border-radius:18px;background:#172338;color:#eef3ff;text-align:center">
+  <h2>تسجيل الدخول إلى RoarNet</h2>
+  <p>أدخل بريدك الإلكتروني حتى يصلك رابط تسجيل الدخول.</p>
+  <form id="rn-auth-form">
+    <input id="rn-auth-email" type="email" required autocomplete="email" placeholder="البريد الإلكتروني"
+      style="width:100%;padding:13px;margin:8px 0;border-radius:9px;border:1px solid #64748b">
+    <button type="submit" style="padding:12px 20px;border:0;border-radius:9px;cursor:pointer;font-weight:bold">إرسال رابط الدخول</button>
+  </form>
+  <p id="rn-auth-status" role="status" aria-live="polite"></p>
+  <div id="rn-auth-user" hidden>
+    <p>تم تسجيل الدخول بالبريد: <strong id="rn-auth-email-view"></strong></p>
+    <button id="rn-auth-logout" type="button">تسجيل الخروج</button>
+  </div>
+</section>
+
+<!-- ROARNET_PARTICIPANT_WALLET_UI_V2 -->
+<section id="rn-wallet" hidden style="max-width:520px;margin:20px auto;padding:22px;border:1px solid #176078;border-radius:20px;background:#091d32;color:#effaff;text-align:right">
+  <h2 style="margin-top:0">أجهزة حساب RoarNet</h2>
+  <p style="color:#9bb7c9">اربط أجهزتك بحسابك حتى تتمكن من إدارتها من مكان واحد.</p>
+
+  <div style="margin-top:18px">
+    <h3>ربط جهاز جديد</h3>
+    <form id="rn-wallet-device-form">
+      <input id="rn-wallet-device-token" type="text" required minlength="64" maxlength="64" pattern="[a-fA-F0-9]{64}" autocomplete="off"
+        placeholder="أدخل رمز الجهاز"
+        style="box-sizing:border-box;width:100%;padding:13px;border-radius:10px;border:1px solid #164b62;background:#04101f;color:#effaff">
+      <button type="submit" style="margin-top:10px;padding:12px 18px;border:0;border-radius:10px;background:#13dfd0;color:#04101f;font-weight:bold">ربط الجهاز بالحساب</button>
+    </form>
+  </div>
+
+  <div style="margin-top:22px">
+    <h3>أجهزتي المرتبطة</h3>
+    <div id="rn-wallet-devices" style="line-height:1.9">جارٍ تحميل الأجهزة...</div>
+    <div id="rn-wallet-device-picker" style="margin-top:14px">
+      <label for="rn-wallet-device-select">اختر الجهاز لإدارة موافقاته</label>
+      <select id="rn-wallet-device-select" style="display:block;width:100%;padding:12px;margin-top:8px;background:#10283a;color:#effaff;border:1px solid #176078;border-radius:9px">
+        <option value="">اختر جهازاً</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="rn-wallet-finance" style="margin-top:24px;padding-top:18px;border-top:1px solid #176078">
+    <h3>محفظتي وأرباحي</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>إجمالي الأرباح</small><strong id="rn-wallet-earned" style="display:block;font-size:23px;color:#13dfd0">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>تمت تسويته محاسبياً</small><strong id="rn-wallet-settled" style="display:block;font-size:23px;color:#13dfd0">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>بانتظار التسوية</small><strong id="rn-wallet-awaiting" style="display:block;font-size:23px;color:#effaff">—</strong>
+      </div>
+      <div style="padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a">
+        <small>الترافيك المساهم به</small><strong id="rn-wallet-bytes" style="display:block;font-size:20px;color:#effaff">—</strong>
+      </div>
+    </div>
+    <h3 style="margin-top:22px">السجل الشهري</h3>
+    <div id="rn-wallet-months" style="display:grid;gap:10px">
+      <p>جارٍ تحميل سجل الأرباح...</p>
+    </div>
+    <p id="rn-wallet-finance-status" role="status" aria-live="polite" style="font-size:13px;color:#13dfd0"></p>
+    <p style="font-size:12px;line-height:1.8;color:#9bb7c9">التسوية المحاسبية تحدد مستحقاتك. تحويل الأموال الفعلي يحتاج إلى تفعيل مزود دفع معتمد، وحالته الحالية غير مفعّلة.</p>
+  </div>
+
+  <p id="rn-wallet-status" role="status" aria-live="polite" style="color:#13dfd0"></p>
+  <button id="rn-wallet-refresh" type="button" style="padding:9px 14px;border:1px solid #176078;border-radius:9px;background:#0d2940;color:#effaff">تحديث المحفظة والأجهزة</button>
+</section>
+<!-- /ROARNET_PARTICIPANT_WALLET_UI_V2 -->
+
+<section id="rn-consent" hidden style="max-width:520px;margin:18px auto;padding:20px;border:1px solid #13a6a0;border-radius:16px;background:#10283a;color:#effaff;text-align:right">
+  <h3>موافقة مشاركة الإنترنت</h3>
+  <p>تتيح RoarNet مشاركة اتصال الإنترنت من عقدتك عبر مزودي الترافيك المعتمدين.</p>
+  <ul style="line-height:1.9">
+    <li>قد يُستخدم عنوان IP الخاص باتصالك ضمن حركة الترافيك التي يمررها المزود.</li>
+    <li>يعتمد احتساب الأرباح على الترافيك الذي يؤكده المزود فعلياً.</li>
+    <li>تختلف فرص الاستخدام والأرباح بحسب الطلب وتوفر الاتصال وشروط المزود.</li>
+    <li>قد يستهلك النشاط بيانات الإنترنت من باقتك.</li>
+    <li>يمكنك إيقاف المشاركة وسحب موافقتك من هذه الواجهة.</li>
+  </ul>
+  <p id="rn-consent-state" role="status" aria-live="polite"></p>
+  <button id="rn-consent-accept" type="button">أوافق على المشاركة</button>
+  <button id="rn-consent-revoke" type="button">إيقاف المشاركة وسحب الموافقة</button>
+</section>
+
+<section id="rn-proxies-consent" hidden style="max-width:520px;margin:18px auto;padding:20px;border:1px solid #2788bd;border-radius:16px;background:#10283a;color:#effaff;text-align:right">
+  <h3>موافقة مشاركة الاتصال مع Proxies.sx</h3>
+  <p>هذه موافقة مستقلة تخص شركة Proxies.sx وحدها.</p>
+  <ul style="line-height:1.9">
+    <li>قد يمر جزء من حركة الإنترنت عبر عنوان IP الخاص باتصال جهازك.</li>
+    <li>قد يستهلك النشاط بيانات من باقة الإنترنت الخاصة بك.</li>
+    <li>تخضع المشاركة لشروط الشركة ومتطلبات RoarNet.</li>
+    <li>تسجيل الموافقة هنا لا يعني بدء تشغيل SDK أو إرسال الترافيك حالياً.</li>
+    <li>يمكنك سحب موافقتك من هذه الواجهة في أي وقت.</li>
+  </ul>
+  <p id="rn-proxies-consent-state" role="status" aria-live="polite"></p>
+  <button id="rn-proxies-consent-accept" type="button">أوافق على مشاركة الاتصال مع Proxies.sx</button>
+  <button id="rn-proxies-consent-revoke" type="button">سحب موافقة Proxies.sx</button>
+</section>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase = createClient(
+  'https://bsmumxfajnzhziezxfth.supabase.co',
+  'sb_publishable_gwrF_3Sk1dRDN7HoMXpTFw_4qctnZob',
+  {
+    auth: {
+      flowType: 'pkce',
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false
+    }
+  }
+);
+
+window.RoarNetHandleAuthCode = async function(code) {
+  const status = document.getElementById('rn-auth-status');
+  status.textContent = 'جارٍ إكمال تسجيل الدخول داخل التطبيق...';
+
+  try {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    if (!data.session) throw new Error('لم يتم إنشاء جلسة الدخول.');
+
+    status.textContent = 'تم تسجيل الدخول بنجاح.';
+    await loadWallet();
+  } catch (error) {
+    status.textContent = 'تعذّر إكمال تسجيل الدخول: ' + error.message;
+  }
+};
+const form = document.getElementById('rn-auth-form');
+const statusBox = document.getElementById('rn-auth-status');
+const userBox = document.getElementById('rn-auth-user');
+const wallet = document.getElementById('rn-wallet');
+const walletStatus = document.getElementById('rn-wallet-status');
+
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));
+
+async function walletRequest(path, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('سجّل الدخول أولاً.');
+
+  const response = await fetch(path, {
+    ...options,
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + session.access_token,
+      ...(options.headers || {})
+    }
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'تعذّر تنفيذ الطلب.');
+  return data;
+}
+
+
+
+let selectedDeviceId = '';
+  let rnRelayActiveDeviceId = '';
+
+
+  document.addEventListener('change', () => {
+    setTimeout(() => {
+      if (rnRelayActiveDeviceId &&
+          rnRelayActiveDeviceId !== selectedDeviceId) {
+        if (window.RoarNetRelay) window.RoarNetRelay.stop();
+        rnRelayActiveDeviceId = '';
+        const b = document.getElementById('rn-relay-agent-toggle');
+        if (b) b.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+      }
+    }, 0);
+  });
+
+async function loadConsent() {
+  const panel = document.getElementById('rn-consent');
+  const state = document.getElementById('rn-consent-state');
+
+  if (!selectedDeviceId) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+
+  try {
+    const data = await walletRequest(
+      '/api/participant/device/consent?deviceId=' +
+      encodeURIComponent(selectedDeviceId)
+    );
+
+    state.textContent = data.accepted
+      ? 'الموافقة فعالة منذ: ' + (data.acceptedAt || 'تاريخ التسجيل')
+      : 'الموافقة غير مفعلة. يلزم قبول المشاركة قبل تسجيل الاستخدام.';
+
+    document.getElementById('rn-consent-accept').hidden = !!data.accepted;
+
+    let relayButton = document.getElementById('rn-relay-agent-toggle');
+    if (!relayButton) {
+      relayButton = document.createElement('button');
+      relayButton.id = 'rn-relay-agent-toggle';
+      relayButton.type = 'button';
+      relayButton.style.cssText =
+        'display:block;margin-top:12px;padding:12px 18px;border:0;border-radius:9px;cursor:pointer;background:#167c68;color:white;font-weight:bold';
+      panel.appendChild(relayButton);
+    }
+    relayButton.hidden = !data.accepted;
+    relayButton.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+    relayButton.onclick = async () => {
+      try {
+        if (!window.RoarNetRelay) throw new Error('خدمة Android غير متاحة.');
+
+        if (rnRelayActiveDeviceId === selectedDeviceId) {
+          window.RoarNetRelay.stop();
+          rnRelayActiveDeviceId = '';
+          relayButton.textContent = 'تشغيل خدمة Relay — وضع التجهيز';
+          state.textContent = 'تم إرسال طلب إيقاف الخدمة.';
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('سجل الدخول أولاً.');
+        if (!selectedDeviceId) throw new Error('اختر جهازاً أولاً.');
+
+        window.RoarNetRelay.stop();
+        const result = window.RoarNetRelay.start(
+          session.access_token, selectedDeviceId
+        );
+        rnRelayActiveDeviceId = selectedDeviceId;
+        relayButton.textContent = 'إيقاف خدمة Relay';
+        state.textContent = result;
+      } catch (error) {
+        state.textContent = error.message;
+      }
+    };
+    document.getElementById('rn-consent-revoke').hidden = !data.accepted;
+  } catch (error) {
+    state.textContent = error.message;
+  }
+}
+
+async function loadProviderConsent(provider, prefix, label) {
+  const panel = document.getElementById('rn-' + prefix + '-consent');
+  const state = document.getElementById('rn-' + prefix + '-consent-state');
+
+  if (!selectedDeviceId) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+
+  try {
+    const data = await walletRequest(
+      '/api/participant/device/provider-consents?deviceId=' +
+      encodeURIComponent(selectedDeviceId)
+    );
+
+    const item = (data.consents || []).find(
+      entry => entry.provider === provider
+    );
+
+    const accepted = !!(item && item.accepted);
+
+    state.textContent = accepted
+      ? 'موافقة ' + label + ' فعالة منذ: ' +
+        (item.acceptedAt || 'تاريخ التسجيل') +
+        ' — التكامل لا يبدأ بمجرد تسجيل الموافقة.'
+      : 'موافقة ' + label + ' غير مفعلة.';
+
+    document.getElementById('rn-' + prefix + '-consent-accept').hidden = accepted;
+    document.getElementById('rn-' + prefix + '-consent-revoke').hidden = !accepted;
+  } catch (error) {
+    state.textContent = error.message;
+    document.getElementById('rn-' + prefix + '-consent-accept').hidden = true;
+    document.getElementById('rn-' + prefix + '-consent-revoke').hidden = true;
+  }
+}
+
+async function loadProxiesConsent() {
+  return loadProviderConsent('proxies_sx', 'proxies', 'Proxies.sx');
+}
+
+async function loadAllDeviceConsents() {
+  if (!selectedDeviceId) return;
+
+  await Promise.all([
+    loadConsent(),
+    loadProxiesConsent()
+  ]);
+}
+
+
+async function loadWalletEarnings() {
+  const status = document.getElementById('rn-wallet-finance-status');
+  const monthsBox = document.getElementById('rn-wallet-months');
+
+  const money = cents => (Number(cents || 0) / 100).toLocaleString('en-US', {
+    style: 'currency', currency: 'USD'
+  });
+
+  const bytesText = value => {
+    let n = Number(value || 0);
+    if (!Number.isFinite(n) || n < 0) n = 0;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) {
+      n /= 1024;
+      i++;
+    }
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + units[i];
+  };
+
+  status.textContent = 'جارٍ تحميل بيانات الأرباح...';
+
+  try {
+    const data = await walletRequest('/api/participant/wallet');
+    const totals = data.totals || {};
+
+    document.getElementById('rn-wallet-earned').textContent = money(totals.earnedCents);
+    document.getElementById('rn-wallet-settled').textContent = money(totals.settledCents);
+    document.getElementById('rn-wallet-awaiting').textContent = money(totals.awaitingSettlementCents);
+    document.getElementById('rn-wallet-bytes').textContent = bytesText(totals.contributionBytes);
+
+    monthsBox.replaceChildren();
+    const months = Array.isArray(data.months) ? data.months : [];
+
+    if (!months.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'لا توجد أرباح مسجلة لهذا الحساب حتى الآن.';
+      monthsBox.appendChild(empty);
+    }
+
+    for (const item of months) {
+      const card = document.createElement('article');
+      card.style.cssText = 'padding:14px;border:1px solid #176078;border-radius:13px;background:#10283a;line-height:1.9';
+
+      const heading = document.createElement('strong');
+      heading.textContent = 'شهر ' + String(item.month || '—');
+      heading.style.color = '#13dfd0';
+
+      const earned = document.createElement('div');
+      earned.textContent = 'الأرباح: ' + money(item.earnedCents);
+
+      const settled = document.createElement('div');
+      settled.textContent = 'التسوية المحاسبية: ' + money(item.settledCents);
+
+      const awaiting = document.createElement('div');
+      awaiting.textContent = 'بانتظار التسوية: ' + money(item.awaitingSettlementCents);
+
+      const traffic = document.createElement('div');
+      traffic.textContent = 'المساهمة: ' + bytesText(item.contributionBytes);
+
+      const state = document.createElement('div');
+      state.style.cssText = 'margin-top:6px;color:#9bb7c9;font-size:13px';
+      state.textContent = item.settlementStatus === 'completed'
+        ? 'حالة التسوية: مكتملة محاسبياً'
+        : 'حالة التسوية: بانتظار الإغلاق الشهري';
+
+      const payout = document.createElement('div');
+      payout.style.cssText = 'color:#f0c879;font-size:13px';
+      payout.textContent = item.payoutStatus === 'not_integrated'
+        ? 'تحويل الأموال: لم يتم ربط مزود دفع بعد'
+        : 'حالة تحويل الأموال: ' + String(item.payoutStatus || 'قيد التحقق');
+
+      card.append(heading, earned, settled, awaiting, traffic, state, payout);
+      monthsBox.appendChild(card);
+    }
+
+    status.textContent = 'تم تحديث المحفظة المالية.';
+  } catch (error) {
+    status.textContent = 'تعذّر تحميل الأرباح: ' + error.message;
+  }
+}
+
+async function loadWallet() {
+  const { data: { session } } = await supabase.auth.getSession();
+  wallet.hidden = !session?.user;
+
+  const devicesBox = document.getElementById('rn-wallet-devices');
+  const picker = document.getElementById('rn-wallet-device-picker');
+  const select = document.getElementById('rn-wallet-device-select');
+
+  if (!session?.user) {
+    selectedDeviceId = '';
+    document.getElementById('rn-consent').hidden = true;
+    document.getElementById('rn-proxies-consent').hidden = true;
+    return;
+  }
+
+  walletStatus.textContent = 'جارٍ تحميل الأجهزة...';
+  loadWalletEarnings();
+  await loadWithdrawalPanel();
+
+  try {
+
+        // ROARNET_AUTO_DEVICE_REGISTRATION_CLIENT_V1
+        const { data: { session: deviceSession } } =
+          await supabase.auth.getSession();
+
+        if (!deviceSession?.access_token) {
+          throw new Error('Participant session is unavailable');
+        }
+
+        const installationKey = 'roarnet_installation_id_v1';
+        let installationId = localStorage.getItem(installationKey);
+
+        if (!installationId ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(installationId)) {
+          const bytes = new Uint8Array(16);
+          crypto.getRandomValues(bytes);
+          bytes[6] = (bytes[6] & 0x0f) | 0x40;
+          bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+          const hex = Array.from(bytes, b =>
+            b.toString(16).padStart(2, '0')
+          ).join('');
+
+          installationId =
+            hex.slice(0, 8) + '-' +
+            hex.slice(8, 12) + '-' +
+            hex.slice(12, 16) + '-' +
+            hex.slice(16, 20) + '-' +
+            hex.slice(20);
+
+          localStorage.setItem(installationKey, installationId);
+        }
+
+        const registrationResponse = await fetch(
+          '/api/participant/devices/register',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + deviceSession.access_token
+            },
+            body: JSON.stringify({
+              installationId,
+              label: 'Android device'
+            })
+          }
+        );
+
+        const registration = await registrationResponse.json();
+
+        if (!registrationResponse.ok || !registration.device?.id) {
+          throw new Error(
+            registration.error || 'Automatic device registration failed'
+          );
+        }
+
+        localStorage.setItem(
+          'roarnet_device_id_v1',
+          registration.device.id
+        );
+        // END ROARNET_AUTO_DEVICE_REGISTRATION_CLIENT_V1
+
+
+        const result = await walletRequest('/api/participant/devices');
+    const devices = Array.isArray(result)
+      ? result
+      : (result.devices || result.items || result.nodes || result.data?.devices || []);
+
+    const previous = selectedDeviceId || select.value;
+
+    devicesBox.replaceChildren();
+    select.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'اختر جهازاً';
+    select.appendChild(placeholder);
+
+    for (const device of devices) {
+      const id = String(device.id ?? '');
+      if (!id) continue;
+
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent =
+        (device.label || device.name || 'جهاز مشارك') +
+        ' — ' + (device.status || 'مسجل');
+      select.appendChild(option);
+
+      const row = document.createElement('div');
+      row.style.cssText =
+        'padding:12px;margin:8px 0;border:1px solid #164b62;border-radius:12px;background:#10283a';
+
+      const name = document.createElement('strong');
+      name.textContent = device.label || device.name ||
+        device.device_name || 'جهاز مشارك';
+
+      const status = document.createElement('div');
+      status.style.color = '#9bb7c9';
+      status.textContent = 'الحالة: ' + (device.status || 'مسجل');
+
+      row.append(name, status);
+      devicesBox.appendChild(row);
+    }
+
+    const usableDevices = devices.filter(device => device.id != null);
+
+    if (!usableDevices.length) {
+      selectedDeviceId = '';
+      picker.hidden = true;
+      document.getElementById('rn-consent').hidden = true;
+      document.getElementById('rn-proxies-consent').hidden = true;
+      devicesBox.textContent =
+        'لا توجد أجهزة مرتبطة. اربط جهازاً بحسابك أولاً.';
+      walletStatus.textContent = 'بانتظار ربط جهاز.';
+      return;
+    }
+
+    picker.hidden = false;
+
+    const chosen = usableDevices.find(
+      device => String(device.id) === String(previous)
+    ) || usableDevices.find(
+      device => device.status === 'active'
+    ) || usableDevices[0];
+
+    selectedDeviceId = String(chosen.id);
+    select.value = selectedDeviceId;
+
+    await loadAllDeviceConsents();
+    walletStatus.textContent = 'تم تحديث الأجهزة والموافقات.';
+  } catch (error) {
+    walletStatus.textContent = error.message;
+  }
+}
+
+document.getElementById('rn-wallet-device-select')
+  .addEventListener('change', async event => {
+    selectedDeviceId = event.target.value;
+    if (selectedDeviceId) {
+      await loadAllDeviceConsents();
+    } else {
+      document.getElementById('rn-consent').hidden = true;
+      document.getElementById('rn-proxies-consent').hidden = true;
+    }
+  });
+
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  statusBox.textContent = 'جارٍ إرسال رابط الدخول...';
+  const email = document.getElementById('rn-auth-email').value.trim();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: 'roarnet://auth-callback' }
+  });
+  statusBox.textContent = error
+    ? 'تعذّر إرسال الرابط: ' + error.message
+    : 'إذا كان البريد صالحاً، ستصلك رسالة تحتوي رابط تسجيل الدخول.';
+});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  const email = session?.user?.email;
+  userBox.hidden = !email;
+  form.hidden = Boolean(email);
+  document.getElementById('rn-auth-email-view').textContent = email || '';
+  if (email) statusBox.textContent = 'تم تسجيل الدخول بنجاح.';
+  wallet.hidden = !email;
+  if (email) setTimeout(loadWallet, 0);
+  else walletStatus.textContent = '';
+});
+
+document.getElementById('rn-auth-logout').addEventListener('click', async () => {
+  if (window.RoarNetRelay) window.RoarNetRelay.stop();
+  rnRelayActiveDeviceId = '';
+  const { error } = await supabase.auth.signOut();
+  statusBox.textContent = error ? 'تعذّر تسجيل الخروج.' : 'تم تسجيل الخروج.';
+});
+
+document.getElementById('rn-wallet-device-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const field = document.getElementById('rn-wallet-device-token');
+  const deviceToken = field.value.trim();
+
+  walletStatus.textContent = 'جارٍ ربط الجهاز...';
+
+  try {
+    await walletRequest('/api/participant/devices/claim', {
+      method: 'POST',
+      body: JSON.stringify({ deviceToken })
+    });
+
+    field.value = '';
+    walletStatus.textContent = 'تم ربط الجهاز بالحساب.';
+    await loadWallet();
+  } catch (error) {
+    walletStatus.textContent = error.message;
+  }
+});
+
+document.getElementById('rn-wallet-refresh').addEventListener('click', loadWallet);
+
+
+
+async function saveSharingConsent(accepted) {
+  if (!selectedDeviceId) {
+    alert('اختر جهازاً أولاً.');
+    return;
+  }
+
+  const path = accepted
+    ? '/api/participant/device/consent'
+    : '/api/participant/device/consent/revoke';
+
+  const body = accepted
+    ? {
+        deviceId: selectedDeviceId,
+        accepted: true,
+        disclosureVersion: 'roarnet-sharing-v1'
+      }
+    : { deviceId: selectedDeviceId };
+
+  const state = document.getElementById('rn-consent-state');
+  state.textContent = 'جارٍ حفظ الموافقة...';
+
+  try {
+    await walletRequest(path, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    if (!accepted && window.RoarNetRelay) window.RoarNetRelay.stop();
+    if (!accepted) { rnRelayActiveDeviceId = ''; const b = document.getElementById('rn-relay-agent-toggle'); if (b) b.textContent = 'تشغيل خدمة Relay — وضع التجهيز'; }
+    await loadConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+}
+
+async function saveProviderConsent(provider, prefix, accepted) {
+  if (!selectedDeviceId) {
+    alert('اختر جهازاً أولاً.');
+    return;
+  }
+
+  const versions = {
+    proxies_sx: 'roarnet-proxies-sx-v1'
+  };
+
+  const path = accepted
+    ? '/api/participant/device/provider-consents'
+    : '/api/participant/device/provider-consents/revoke';
+
+  const body = accepted
+    ? {
+        deviceId: selectedDeviceId,
+        provider,
+        accepted: true,
+        disclosureVersion: versions[provider]
+      }
+    : {
+        deviceId: selectedDeviceId,
+        provider
+      };
+
+  const state = document.getElementById(
+    'rn-' + prefix + '-consent-state'
+  );
+  state.textContent = 'جارٍ حفظ الموافقة...';
+
+  try {
+    await walletRequest(path, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+
+    // ROARNET_PROXIES_SDK_REVOKE_STOP_V1
+    if (provider === 'proxies_sx' && !accepted &&
+        window.RoarNetProxiesSDK) {
+      window.RoarNetProxiesSDK.stop();
+    }
+
+    if (provider === 'proxies_sx') await loadProxiesConsent();
+  } catch (error) {
+    state.textContent = error.message;
+  }
+}
+
+document.getElementById('rn-consent-accept')
+  .addEventListener('click', () => saveSharingConsent(true));
+
+document.getElementById('rn-consent-revoke')
+  .addEventListener('click', () => saveSharingConsent(false));
+
+document.getElementById('rn-proxies-consent-accept')
+  .addEventListener('click', () => saveProviderConsent('proxies_sx', 'proxies', true));
+
+document.getElementById('rn-proxies-consent-revoke')
+  .addEventListener('click', () => saveProviderConsent('proxies_sx', 'proxies', false));
+
+const { data: { session: initialSession } } = await supabase.auth.getSession();
+if (initialSession?.user) {
+  userBox.hidden = false;
+  form.hidden = true;
+  document.getElementById('rn-auth-email-view').textContent = initialSession.user.email || '';
+  wallet.hidden = false;
+  await loadWallet();
+}
+
+
+// ROARNET_WITHDRAWAL_UI_V1
+async function loadWithdrawalPanel() {
+  const message = document.getElementById('rn-withdraw-message');
+  const list = document.getElementById('rn-withdraw-list');
+  if (!list) return;
+
+  try {
+    const data = await walletRequest('/api/participant/withdrawals');
+
+    document.getElementById('rn-withdraw-available').textContent =
+      '$' + (Number(data.availableCents || 0) / 100).toFixed(2);
+
+    list.replaceChildren();
+
+    for (const item of (data.withdrawals || [])) {
+      const li = document.createElement('li');
+      const amount = (Number(item.amount_cents || 0) / 100).toFixed(2);
+      const statuses = {
+        queued: 'بانتظار المراجعة اليدوية',
+        processing: 'جارٍ تنفيذ التحويل',
+        paid: 'تم تأكيد التحويل',
+        failed: 'تعذر التحويل — يحتاج معالجة'
+      };
+      li.textContent =
+        '#' + item.id + ' — $' + amount + ' — ' +
+        (statuses[item.status] || item.status) +
+        ' — ' + String(item.created_at || '');
+      list.appendChild(li);
+    }
+
+    if (!data.withdrawals?.length) {
+      const li = document.createElement('li');
+      li.textContent = 'لا توجد طلبات سحب حالياً.';
+      list.appendChild(li);
+    }
+
+    message.textContent = 'تم تحديث سجل السحب.';
+  } catch (error) {
+    message.textContent = error.message || 'تعذر تحميل سجل السحب.';
+  }
+}
+
+document.getElementById('rn-withdraw-refresh')
+  ?.addEventListener('click', loadWithdrawalPanel);
+
+document.getElementById('rn-withdraw-submit')
+  ?.addEventListener('click', async () => {
+    const input = document.getElementById('rn-withdraw-amount');
+    const addressInput = document.getElementById('rn-withdraw-address');
+    const destinationAddress = addressInput.value.trim();
+    const message = document.getElementById('rn-withdraw-message');
+    const button = document.getElementById('rn-withdraw-submit');
+
+    const amount = Number(input.value);
+    const amountCents = Math.round(amount * 100);
+
+    if (!Number.isFinite(amount) || amount < 1 ||
+        !Number.isSafeInteger(amountCents) ||
+        Math.abs(amount * 100 - amountCents) > 0.000001) {
+      message.textContent = 'الحد الأدنى للسحب دولار واحد، أدخل مبلغاً صحيحاً.';
+      return;
+    }
+
+    if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(destinationAddress)) {
+      message.textContent = 'تحقق من عنوان محفظة TRC20؛ يجب أن يبدأ بحرف T ويكون صحيح التنسيق.';
+      return;
+    }
+
+    if (button.disabled) return;
+
+    button.disabled = true;
+    message.textContent = 'جارٍ تقديم الطلب...';
+
+    try {
+      const data = await walletRequest(
+        '/api/participant/withdrawals',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amountCents, destinationAddress })
+        }
+      );
+
+      input.value = '';
+      addressInput.value = '';
+      message.textContent = 'تم تسجيل طلب السحب في قائمة الانتظار.';
+      await loadWithdrawalPanel();
+
+      if (typeof loadWalletEarnings === 'function') {
+        await loadWalletEarnings();
+      }
+    } catch (error) {
+      message.textContent = error.message || 'حدث خطأ أثناء تقديم الطلب.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+// END ROARNET_WITHDRAWAL_UI_V1
+
+</script>
+
+<!-- ROARNET_ADMIN_LINK_CODE_UI_V1 -->
+<section id="rn-admin-link-code" style="max-width:520px;margin:20px auto;padding:20px;border:1px solid #8b6b2d;border-radius:16px;background:#201d16;color:#fff4d6;text-align:right">
+  <h2>إدارة ربط المشاركين</h2>
+  <p>أدخل معرّف العقدة النشطة لإصدار رمز ربط مؤقت.</p>
+  <input id="rn-admin-node-id" type="text" dir="ltr"
+    placeholder="Node UUID"
+    autocomplete="off"
+    style="box-sizing:border-box;width:100%;padding:12px;border-radius:9px;border:1px solid #806b43;background:#100f0c;color:white">
+  <button id="rn-admin-generate-code" type="button"
+    style="margin-top:10px;padding:12px 18px;border:0;border-radius:9px;background:#e8bd62;color:#20170a;font-weight:bold">
+    إصدار رمز الربط
+  </button>
+  <p id="rn-admin-code-status" role="status" aria-live="polite"></p>
+  <div id="rn-admin-code-result" hidden>
+    <p>رمز الربط — صالح لمدة 15 دقيقة:</p>
+    <code id="rn-admin-code-value" dir="ltr" style="display:block;overflow-wrap:anywhere;padding:12px;background:#100f0c;border-radius:8px"></code>
+    <button id="rn-admin-copy-code" type="button">نسخ الرمز</button>
+    <p style="font-size:12px">احفظ الرمز وأرسله للمشارك. يظهر مرة واحدة فقط.</p>
+  </div>
+</section>
+<script>
+(() => {
+  const button = document.getElementById('rn-admin-generate-code');
+  const status = document.getElementById('rn-admin-code-status');
+  const result = document.getElementById('rn-admin-code-result');
+  const codeBox = document.getElementById('rn-admin-code-value');
+
+  button.addEventListener('click', () => {
+    const nodeId = document.getElementById('rn-admin-node-id').value.trim();
+    result.hidden = true;
+    status.textContent = '';
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nodeId)) {
+      status.textContent = 'أدخل معرّف عقدة UUID صالحاً.';
+      return;
+    }
+
+    if (!window.RoarNetAdmin ||
+        typeof window.RoarNetAdmin.generateParticipantLinkCode !== 'function') {
+      status.textContent = 'هذه الميزة متاحة داخل تطبيق RoarNet على أندرويد.';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = 'بانتظار تأكيد المدير...';
+
+    try {
+      const response = JSON.parse(
+        window.RoarNetAdmin.generateParticipantLinkCode(nodeId)
+      );
+
+      if (!response.code) {
+        status.textContent = response.error || 'تعذر إصدار الرمز.';
+        return;
+      }
+
+      codeBox.textContent = response.code;
+      result.hidden = false;
+      status.textContent = 'تم إصدار الرمز. ينتهي: ' + response.expiresAt;
+    } catch (error) {
+      status.textContent = 'تعذر إصدار الرمز.';
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  document.getElementById('rn-admin-copy-code').addEventListener('click', async () => {
+    const code = codeBox.textContent;
+    try {
+      await navigator.clipboard.writeText(code);
+      status.textContent = 'تم نسخ الرمز.';
+    } catch (_) {
+      status.textContent = 'تعذر النسخ تلقائياً؛ انسخ الرمز يدوياً.';
+    }
+  });
+})();
+</script>
+<!-- /ROARNET_ADMIN_LINK_CODE_UI_V1 -->
+
+<!-- /ROARNET_SUPABASE_LOGIN_V1 -->
+
+
+<nav class="rn-bottom-nav" aria-label="التنقل الرئيسي">
+  <a href="#rn-home" class="active"><span>⌂</span>الرئيسية</a>
+  <a href="#rn-wallet"><span>◈</span>المحفظة</a>
+  <a href="#rn-revenue"><span>↗</span>الإيرادات</a>
+  <a href="#rn-auth"><span>♙</span>حسابي</a>
+</nav>
+<script id="rn-redesign-nav">
+(() => {
+  const links = [...document.querySelectorAll('.rn-bottom-nav a')];
+  const update = () => {
+    const hash = location.hash || '#rn-home';
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === hash));
+  };
+  links.forEach(a => a.addEventListener('click', () => {
+    links.forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+  }));
+  window.addEventListener('hashchange', update);
+  update();
+})();
+</script>
+
+<script id="rn-public-stats-loader">
+(() => {
+  const number = value => Number(value || 0).toLocaleString('en-US');
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  async function loadPublicStats() {
+    const status = document.getElementById('rn-stats-status');
+    try {
+      const response = await fetch('/api/public/stats', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+
+      const data = await response.json();
+      set('rn-stat-registered', number(data.registeredParticipants));
+      set('rn-stat-consented', number(data.consentedParticipants));
+      set('rn-stat-visits', number(data.totalVisits));
+
+      const gb = Number(data.totalRelayTrafficGb);
+      set(
+        'rn-stat-traffic',
+        Number.isFinite(gb) ? gb.toLocaleString('en-US', {
+          maximumFractionDigits: 3
+        }) + ' GB' : 'غير متاح'
+      );
+
+      set('rn-stat-events', number(data.relayTrafficEvents));
+
+      const ips = data.activeIps24h;
+      set('rn-stat-ips', ips === null || ips === undefined
+        ? 'غير متاح'
+        : number(ips));
+
+      set('rn-stats-note', data.note || 'الأرقام حسب السجلات المتاحة في الخادم.');
+      if (status) status.textContent = '● تم التحديث';
+    } catch (error) {
+      if (status) status.textContent = 'تعذّر الاتصال بالخادم';
+    }
+  }
+
+  loadPublicStats();
+  window.setInterval(loadPublicStats, 60000);
+})();
+</script>
+
+
+<!-- ROARNET_ADMIN_FINANCE_DASHBOARD_V1 -->
+<section id="rn-admin-finance" hidden dir="rtl"
+  style="margin:20px auto;padding:18px;max-width:900px;
+  border:1px solid #555;border-radius:16px;background:#151923;color:#fff">
+
+  <h2>لوحة الإدارة المالية</h2>
+  <p style="color:#aaa">إيرادات المزوّد وتسويات المشاركين</p>
+
+  <div id="rn-finance-status" role="status"
+    style="padding:10px;border-radius:8px;background:#252d3b">
+    جاري تحميل البيانات...
+  </div>
+
+  <div id="rn-finance-summary"
+    style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;margin:16px 0"></div>
+
+  <h3>تسجيل تقرير إيراد شهري</h3>
+  <p style="color:#e5bd70;font-size:13px">
+    أدخل بيانات تقرير المزوّد الفعلي بعد التحقق منه.
+    التسجيل ينشئ تسوية مالية ويحتاج تأكيداً من نافذة Android.
+  </p>
+
+  <form id="rn-finance-form" style="display:grid;gap:10px">
+    <label>مرجع تقرير المزوّد
+      <input id="rn-fin-ref" required minlength="8" maxlength="120"
+        pattern="[A-Za-z0-9_.:-]{8,120}"
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>الشهر
+      <input id="rn-fin-month" type="month" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>الترافيك بالبايت
+      <input id="rn-fin-bytes" type="number" min="1" step="1" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <label>صافي الإيراد بالدولار
+      <input id="rn-fin-usd" type="number" min="0.01" max="1000000"
+        step="0.01" required
+        style="display:block;width:100%;padding:11px;margin-top:5px">
+    </label>
+
+    <button type="submit" style="padding:13px;border:0;border-radius:9px;
+      background:#2878d0;color:white;font-weight:bold">
+      مراجعة وتسجيل التسوية
+    </button>
+  </form>
+
+  <h3 style="margin-top:25px">دفعات المزوّد السابقة</h3>
+  <div id="rn-finance-batches">لم يتم تحميل الدفعات.</div>
+
+  <p style="font-size:12px;color:#aaa;margin-top:18px">
+    التوزيع: المالك 80%، المشاركون 15%، احتياطي التشغيل 5%.
+    هذه النسب تطبق على صافي إيرادات المزوّد المسجلة.
+    إيرادات المبيعات منفصلة عن هذه التسويات.
+  </p>
+
+  <button id="rn-finance-refresh" type="button"
+    style="padding:10px 16px;border-radius:8px">
+    تحديث البيانات
+  </button>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  const panel = document.getElementById("rn-admin-finance");
+  const status = document.getElementById("rn-finance-status");
+  const summary = document.getElementById("rn-finance-summary");
+  const batches = document.getElementById("rn-finance-batches");
+  const form = document.getElementById("rn-finance-form");
+
+  if (!panel || !window.RoarNetAdmin) return;
+
+  panel.hidden = false;
+
+  function showStatus(message, error) {
+    status.textContent = message;
+    status.style.border = error ? "1px solid #d65b5b" : "1px solid #477d61";
+  }
+
+  function money(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? "$" + n.toFixed(2) : "$0.00";
+  }
+
+  function card(label, value) {
+    const el = document.createElement("div");
+    el.style.cssText =
+      "padding:14px;background:#252d3b;border-radius:10px;min-width:0";
+
+    const title = document.createElement("div");
+    title.textContent = label;
+    title.style.cssText = "font-size:12px;color:#bbb";
+
+    const amount = document.createElement("strong");
+    amount.textContent = value;
+    amount.style.cssText = "display:block;margin-top:8px;font-size:19px";
+
+    el.append(title, amount);
+    return el;
+  }
+
+  function parseResponse(raw) {
+    const result = JSON.parse(raw);
+    if (!result || result.error) {
+      throw new Error(result && result.error
+        ? result.error : "استجابة الخادم غير صالحة");
+    }
+    return result;
+  }
+
+  function renderBatches(items) {
+    batches.replaceChildren();
+
+    if (!items.length) {
+      batches.textContent = "لا توجد دفعات مسجلة حتى الآن.";
+      return;
+    }
+
+    items.forEach(function (item) {
+      const box = document.createElement("article");
+      box.style.cssText =
+        "padding:13px;margin:10px 0;background:#252d3b;border-radius:10px";
+
+      const title = document.createElement("strong");
+      title.textContent = item.month + " — " + item.reference;
+
+      const details = document.createElement("p");
+      details.textContent =
+        "الترافيك: " + Number(item.providerBytes).toLocaleString() +
+        " بايت | صافي الإيراد: " + money(item.netUsd);
+
+      const split = document.createElement("p");
+      split.textContent =
+        "المالك: " + money(item.ownerShareUsd) +
+        " | المشاركون: " + money(item.participantPoolUsd) +
+        " | الاحتياطي: " + money(item.operatingReserveUsd);
+
+      box.append(title, details, split);
+      batches.appendChild(box);
+    });
+  }
+
+  function refresh() {
+    if (!window.RoarNetAdmin) {
+      showStatus("الجسر المالي غير متاح في هذه البيئة.", true);
+      return;
+    }
+
+    try {
+      showStatus("جاري جلب التسويات...", false);
+
+      const result = parseResponse(
+        window.RoarNetAdmin.getProviderRevenueBatches()
+      );
+
+      const items = Array.isArray(result.batches) ? result.batches : [];
+      renderBatches(items);
+
+      const totals = items.reduce(function (acc, item) {
+        acc.net += Number(item.netUsd) || 0;
+        acc.owner += Number(item.ownerShareUsd) || 0;
+        acc.participants += Number(item.participantPoolUsd) || 0;
+        acc.reserve += Number(item.operatingReserveUsd) || 0;
+        return acc;
+      }, {net:0, owner:0, participants:0, reserve:0});
+
+      summary.replaceChildren(
+        card("إجمالي صافي الدفعات", money(totals.net)),
+        card("حصة المالك", money(totals.owner)),
+        card("حصة المشاركين", money(totals.participants)),
+        card("احتياطي التشغيل", money(totals.reserve))
+      );
+
+      showStatus("تم تحميل " + items.length + " دفعة.", false);
+    } catch (error) {
+      showStatus(error.message || "تعذر تحميل البيانات.", true);
+    }
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    const payload = {
+      reference: document.getElementById("rn-fin-ref").value.trim(),
+      month: document.getElementById("rn-fin-month").value,
+      providerBytes: Number(document.getElementById("rn-fin-bytes").value),
+      netUsd: Number(document.getElementById("rn-fin-usd").value)
+    };
+
+    if (!Number.isSafeInteger(payload.providerBytes) ||
+        payload.providerBytes <= 0 ||
+        !Number.isFinite(payload.netUsd) ||
+        payload.netUsd <= 0) {
+      showStatus("تحقق من قيم الترافيك والإيراد.", true);
+      return;
+    }
+
+    try {
+      showStatus("بانتظار تأكيد تسجيل التسوية...", false);
+
+      const result = parseResponse(
+        window.RoarNetAdmin.createProviderRevenueBatch(
+          JSON.stringify(payload)
+        )
+      );
+
+      showStatus(
+        "تم تسجيل التسوية. رقم الدفعة: " + result.batchId,
+        false
+      );
+
+      form.reset();
+      refresh();
+    } catch (error) {
+      showStatus(error.message || "تعذر تسجيل التسوية.", true);
+    }
+  });
+
+  document.getElementById("rn-finance-refresh")
+    .addEventListener("click", refresh);
+
+  refresh();
+})();
+</script>
+<!-- /ROARNET_ADMIN_FINANCE_DASHBOARD_V1 -->
+
+
+
+<!-- ROARNET_ADMIN_WITHDRAWAL_PANEL_V1 -->
+<section id="rn-admin-withdrawals"
+ style="margin:18px 0;padding:18px;border:1px solid #416078;border-radius:14px;background:#102333;color:#e8f3fa">
+  <h3>إدارة طلبات سحب المشاركين</h3>
+  <p style="font-size:13px;color:#b8ccda">
+    راجع عنوان المحفظة والمبلغ قبل معالجة الطلب. تسجيل التحويل كمدفوع يتطلب مرجع معاملة TRON بعد التحقق اليدوي منها.
+  </p>
+  <button id="rn-admin-withdrawals-refresh" type="button"
+   style="padding:10px 16px;border:0;border-radius:8px">
+   تحديث طلبات السحب
+  </button>
+  <p id="rn-admin-withdrawals-status" role="status"></p>
+  <div id="rn-admin-withdrawals-list"></div>
+</section>
+
+<script>
+(function () {
+  const panel = document.getElementById("rn-admin-withdrawals");
+  const list = document.getElementById("rn-admin-withdrawals-list");
+  const statusBox = document.getElementById("rn-admin-withdrawals-status");
+  const refreshButton = document.getElementById("rn-admin-withdrawals-refresh");
+
+  if (!panel || !window.RoarNetAdmin ||
+      typeof window.RoarNetAdmin.getAdminWithdrawals !== "function" ||
+      typeof window.RoarNetAdmin.updateAdminWithdrawal !== "function") {
+    if (panel) {
+      statusBox.textContent = "إدارة السحب متاحة داخل تطبيق RoarNet على أندرويد.";
+    }
+    return;
+  }
+
+  function parseResult(raw) {
+    let result;
+    try {
+      result = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (_) {
+      throw new Error("استجابة الخادم غير مفهومة.");
+    }
+    if (!result || result.error) {
+      throw new Error(result && result.error ? result.error : "تعذر تنفيذ العملية.");
+    }
+    return result;
+  }
+
+  function money(cents) {
+    return "$" + (Number(cents || 0) / 100).toFixed(2);
+  }
+
+  function addText(parent, tag, value) {
+    const element = document.createElement(tag);
+    element.textContent = value == null ? "" : String(value);
+    parent.appendChild(element);
+    return element;
+  }
+
+  function render(items) {
+    list.replaceChildren();
+
+    if (!items.length) {
+      addText(list, "p", "لا توجد طلبات سحب حالياً.");
+      return;
+    }
+
+    items.forEach(function (item) {
+      const card = document.createElement("div");
+      card.style.cssText =
+        "padding:14px;margin:12px 0;border:1px solid #38566b;border-radius:10px;background:#172f40";
+
+      addText(card, "strong",
+        "طلب #" + item.id + " — " + money(item.amount_cents));
+
+      addText(card, "p", "معرّف المشارك: " + item.participant_id);
+      addText(card, "p", "الشبكة: " + (item.network || "TRC20"));
+      addText(card, "p", "الحالة: " + item.status);
+      addText(card, "p", "عنوان المحفظة: " + (item.destination_address || ""));
+      addText(card, "p", "تاريخ الطلب: " + (item.created_at || ""));
+
+      if (item.payout_reference) {
+        addText(card, "p", "مرجع التحويل: " + item.payout_reference);
+      }
+      if (item.admin_note) {
+        addText(card, "p", "ملاحظة الإدارة: " + item.admin_note);
+      }
+
+      if (item.status === "queued" || item.status === "processing") {
+        const note = document.createElement("input");
+        note.type = "text";
+        note.placeholder = "ملاحظة الإدارة أو سبب الرفض";
+        note.setAttribute("data-note", "");
+        note.style.cssText =
+          "display:block;width:100%;box-sizing:border-box;padding:10px;margin:8px 0;border-radius:7px";
+        card.appendChild(note);
+
+        if (item.status === "queued") {
+          const processButton = document.createElement("button");
+          processButton.type = "button";
+          processButton.textContent = "بدء المعالجة";
+          processButton.dataset.action = "processing";
+          processButton.dataset.id = item.id;
+          processButton.style.margin = "4px";
+          card.appendChild(processButton);
+        }
+
+        if (item.status === "processing") {
+          const tx = document.createElement("input");
+          tx.type = "text";
+          tx.placeholder = "مرجع معاملة TRON (64 خانة hex)";
+          tx.setAttribute("data-tx", "");
+          tx.autocomplete = "off";
+          tx.spellcheck = false;
+          tx.style.cssText =
+            "display:block;width:100%;box-sizing:border-box;padding:10px;margin:8px 0;border-radius:7px";
+          card.appendChild(tx);
+
+          const paidButton = document.createElement("button");
+          paidButton.type = "button";
+          paidButton.textContent = "تسجيل التحويل كمدفوع";
+          paidButton.dataset.action = "paid";
+          paidButton.dataset.id = item.id;
+          paidButton.style.margin = "4px";
+          card.appendChild(paidButton);
+        }
+
+        const failButton = document.createElement("button");
+        failButton.type = "button";
+        failButton.textContent = "رفض الطلب";
+        failButton.dataset.action = "failed";
+        failButton.dataset.id = item.id;
+        failButton.style.margin = "4px";
+        card.appendChild(failButton);
+      }
+
+      list.appendChild(card);
+    });
+  }
+
+  function refresh() {
+    statusBox.textContent = "جاري تحميل طلبات السحب...";
+    try {
+      const result = parseResult(window.RoarNetAdmin.getAdminWithdrawals());
+      render(Array.isArray(result.withdrawals) ? result.withdrawals : []);
+      statusBox.textContent = "تم تحديث سجل طلبات السحب.";
+    } catch (error) {
+      statusBox.textContent = error.message || "تعذر تحميل الطلبات.";
+    }
+  }
+
+  refreshButton.addEventListener("click", refresh);
+
+  list.addEventListener("click", function (event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+
+    const card = button.parentElement;
+    const id = button.dataset.id;
+    const action = button.dataset.action;
+    const note = card.querySelector("[data-note]");
+    const tx = card.querySelector("[data-tx]");
+
+    const payload = {
+      status: action,
+      adminNote: note ? note.value.trim() : ""
+    };
+
+    if (action === "paid") {
+      payload.payoutReference = tx ? tx.value.trim() : "";
+      if (!/^[a-fA-F0-9]{64}$/.test(payload.payoutReference)) {
+        statusBox.textContent = "أدخل مرجع معاملة TRON صحيحاً بطول 64 خانة.";
+        return;
+      }
+    }
+
+    if (action === "failed" && payload.adminNote.length < 3) {
+      statusBox.textContent = "اكتب سبب رفض الطلب.";
+      return;
+    }
+
+    if (action === "paid" &&
+        !window.confirm("هل تحققت يدوياً من معاملة TRON ومن وصول المبلغ إلى المحفظة؟")) {
+      return;
+    }
+
+    button.disabled = true;
+    statusBox.textContent = "جاري تحديث الطلب...";
+
+    try {
+      const result = parseResult(
+        window.RoarNetAdmin.updateAdminWithdrawal(
+          String(id),
+          JSON.stringify(payload)
+        )
+      );
+      statusBox.textContent = "تم تحديث حالة الطلب #" + result.id;
+      refresh();
+    } catch (error) {
+      statusBox.textContent = error.message || "تعذر تحديث الطلب.";
+      button.disabled = false;
+    }
+  });
+
+  refresh();
+})();
+</script>
+<!-- END ROARNET_ADMIN_WITHDRAWAL_PANEL_V1 -->
+
+
+<!-- ROARNET_WITHDRAWAL_UI_V1 -->
+<section id="roarnet-withdrawal-panel"
+ style="display:block;margin:18px 0;padding:18px;border:1px solid #29465b;border-radius:14px;background:#102333;color:#e8f3fa">
+  <h3 style="margin:0 0 12px">طلبات سحب الأرباح</h3>
+  <p style="font-size:13px;color:#a9c3d4;line-height:1.7">
+    الرصيد المتاح للسحب:
+    <strong id="rn-withdraw-available">$0.00</strong>
+  </p>
+  <label for="rn-withdraw-amount">مبلغ السحب بالدولار</label>
+  <input id="rn-withdraw-amount" type="number" min="1"
+   step="0.01" placeholder="مثال: 5.00"
+   style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;border-radius:8px">
+  <label for="rn-withdraw-address">عنوان محفظة USDT على شبكة TRC20</label>
+  <input id="rn-withdraw-address" type="text"
+   inputmode="text" autocomplete="off" spellcheck="false"
+   placeholder="أدخل عنوان TRON الذي يبدأ بحرف T"
+   style="display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 12px;border-radius:8px">
+  <button id="rn-withdraw-submit" type="button"
+   style="padding:11px 18px;border:0;border-radius:8px;cursor:pointer">
+   تقديم طلب السحب
+  </button>
+  <button id="rn-withdraw-refresh" type="button"
+   style="padding:11px 18px;border:0;border-radius:8px;cursor:pointer">
+   تحديث السجل
+  </button>
+  <p id="rn-withdraw-message" role="status"
+   style="font-size:13px;line-height:1.7"></p>
+  <h4>سجل الطلبات</h4>
+  <ul id="rn-withdraw-list" style="padding-right:20px;line-height:2"></ul>
+  <p style="font-size:12px;color:#a9c3d4">
+    تقديم الطلب يحجز المبلغ محاسبياً. التحويل الفعلي يحتاج تفعيل مزود دفع.
+  </p>
+</section>
+<!-- END ROARNET_WITHDRAWAL_UI_V1 -->
+
+</body>
+</html>

@@ -1,0 +1,107 @@
+name: RoarNet Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - standalone-apk-integration
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - 'build.gradle*'
+      - 'settings.gradle*'
+      - 'gradle.properties'
+      - 'gradlew'
+      - '.github/workflows/android-debug.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure preinstalled Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          test -d "$SDK_ROOT/cmdline-tools"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android SDK 35 and matching NDK
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865"
+
+      - name: Download and stage Node.js Mobile
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/nodejs-mobile-android-26.12.1-0.zip"
+
+          curl --fail --location --show-error --retry 3 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/ma2871429-cmd/RoarNet/releases/assets/696585675" \
+            -o "$ZIP"
+
+          echo "58e0b7d9455b06703d4001eddfe0445f9cd9671b9045b665dce0e725cd7b994e  $ZIP" | sha256sum --check -
+
+          mkdir -p app/libnode
+          unzip -oq "$ZIP" 'bin/arm64-v8a/libnode.so' 'include/node/*' -d app/libnode
+
+          test -s app/libnode/bin/arm64-v8a/libnode.so
+          test -s app/libnode/include/node/node.h
+
+          echo "Node.js Mobile runtime staged successfully."
+
+      - name: Package native libraries into APK
+        run: |
+          set -euo pipefail
+
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          LIB_DIR="app/src/main/jniLibs/arm64-v8a"
+
+          mkdir -p "$LIB_DIR"
+
+          cp app/libnode/bin/arm64-v8a/libnode.so "$LIB_DIR/libnode.so"
+
+          cp "$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" \
+            "$LIB_DIR/libc++_shared.so"
+
+          echo "Native libraries staged for arm64-v8a APK."
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant Gradle permission
+        run: chmod +x gradlew
+
+      - name: Build APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoarNet-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

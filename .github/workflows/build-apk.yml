@@ -20,7 +20,28 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
       - name: Install Android components
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Download Node.js C++ runtime
+        run: |
+          set -e
+          URL="https://github.com/fogtape/nodejs-mobile/releases/download/v26.12.1-0/nodejs-mobile-android-26.12.1-0.zip"
+          curl -fL "$URL" -o "$RUNNER_TEMP/nodejs-mobile.zip"
+          mkdir -p "$RUNNER_TEMP/nodejs-mobile"
+          unzip -oq "$RUNNER_TEMP/nodejs-mobile.zip" \
+            'bin/arm64-v8a/libnode.so' 'include/node/*' \
+            -d "$RUNNER_TEMP/nodejs-mobile"
+          mkdir -p app/libnode/bin/arm64-v8a app/libnode/include
+          cp "$RUNNER_TEMP/nodejs-mobile/bin/arm64-v8a/libnode.so" \
+            app/libnode/bin/arm64-v8a/
+          cp -R "$RUNNER_TEMP/nodejs-mobile/include/node" \
+            app/libnode/include/
+          test -s app/libnode/bin/arm64-v8a/libnode.so
+
+      - name: Package Node.js C++ runtime
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" app/src/main/jniLibs/arm64-v8a/
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RoarNet - اربح كوينز</title>
+<style>
+body{font-family:Arial;text-align:center;background:#0f172a;color:#fff;padding:20px}
+.card{background:#1e293b;padding:20px;border-radius:15px;margin:15px auto;max-width:400px}
+button{background:#f59e0b;border:none;padding:15px 30px;font-size:18px;border-radius:10px;cursor:pointer;width:100%;margin:5px 0}
+#coins{font-size:32px;color:#fbbf24}
+</style>
+</head>
+<body>
+<h1>🦁 RoarNet</h1>
+<div class="card">
+<p>رصيدك</p>
+<div id="coins">0</div>
+<p>Coins</p>
+<p id="today">اليوم: 0 / 10 اعلانات</p>
+<button onclick="watchAd()">▶️ شاهد اعلان +10 Coins</button>
+<button onclick="window.location.href='privacy.html'">سياسة الخصوصية</button>
+</div>
+<script>
+const ADMOB_APP_ID = "ca-app-pub-9782709035691744~8751418011";
+const ADMOB_AD_UNIT = "ca-app-pub-9782709035691744/3906285447";
+const REWARD_COINS = 10;
+const MAX_ADS_PER_DAY = 10;
+let coins = parseInt(localStorage.getItem('roar_coins')||'0');
+let todayCount = parseInt(localStorage.getItem('roar_today')||'0');
+let todayDate = localStorage.getItem('roar_date')||'';
+let todayStr = new Date().toDateString();
+if(todayDate !== todayStr){ todayCount=0; localStorage.setItem('roar_date',todayStr); }
+function updateUI(){ document.getElementById('coins').textContent=coins; document.getElementById('today').textContent='اليوم: '+todayCount+' / '+MAX_ADS_PER_DAY+' اعلانات'; }
+function watchAd(){
+  if(todayCount >= MAX_ADS_PER_DAY){ alert('وصلت للحد اليومي 10'); return; }
+  if(window.AndroidAd){ window.AndroidAd.showRewarded(); }
+  else { simulateReward(); }
+}
+function simulateReward(){ coins+=REWARD_COINS; todayCount++; localStorage.setItem('roar_coins',coins); localStorage.setItem('roar_today',todayCount); updateUI(); alert('+'+REWARD_COINS+' Coins! رصيدك: '+coins); }
+function onAdRewarded(){ simulateReward(); }
+updateUI();
+</script>
+</body>
+</html>
