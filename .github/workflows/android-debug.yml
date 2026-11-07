@@ -95,6 +95,20 @@ jobs:
       - name: Grant Gradle permission
         run: chmod +x gradlew
 
+      - name: Configure Proxies.sx SDK secret
+        env:
+          PROXIES_FARMER_API_KEY: ${{ secrets.PROXIES_FARMER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PROXIES_FARMER_API_KEY:-}" ]; then
+            echo "::error::Missing PROXIES_FARMER_API_KEY repository secret."
+            exit 1
+          fi
+          umask 077
+          printf 'PROXIES_FARMER_API_KEY=%s\n' "$PROXIES_FARMER_API_KEY" > local.properties
+          test -s local.properties
+          echo "Proxies.sx SDK secret configured."
+
       - name: Build APK
         run: ./gradlew assembleDebug --stacktrace
 

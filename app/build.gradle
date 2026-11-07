@@ -1,10 +1,26 @@
+
 plugins { id 'com.android.application' }
 
+def roarnetLocalProperties = new Properties()
+def roarnetLocalPropertiesFile = rootProject.file("local.properties")
+if (roarnetLocalPropertiesFile.exists()) {
+    roarnetLocalPropertiesFile.withInputStream {
+        roarnetLocalProperties.load(it)
+    }
+}
+def roarnetProxiesKey = roarnetLocalProperties.getProperty("PROXIES_FARMER_API_KEY", "")
+
+
 android {
+    buildFeatures { buildConfig true }
+
     namespace 'com.roarnet.app'
     compileSdk 35
     ndkVersion "29.0.14206865"
     defaultConfig {
+        buildConfigField "String", "PROXIES_FARMER_API_KEY",
+                "\"" + roarnetProxiesKey.replace("\\", "\\\\").replace('"', '\\"') + "\""
+
         applicationId 'com.roarnet.app'
         minSdk 24
         externalNativeBuild {

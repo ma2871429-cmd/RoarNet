@@ -237,16 +237,93 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ROARNET_PROXIES_SDK_STOP_BRIDGE_V1
-    private final class RoarNetProxiesSDKBridge {
-        @JavascriptInterface
-        public String stop() {
-            try {
-                sx.proxies.peer.ProxiesPeerSDK.getInstance().stop();
-                return "تم إرسال طلب إيقاف SDK.";
-            } catch (Exception e) {
-                return "SDK غير مهيأ أو متوقف.";
+    // ROARNET_PROXIES_SDK_START_V1
+private final class RoarNetProxiesSDKBridge {
+
+    @JavascriptInterface
+    public String start() {
+        try {
+            String key = BuildConfig.PROXIES_FARMER_API_KEY;
+            if (key == null || key.trim().isEmpty()) {
+                return "مفتاح Proxies.sx غير مضبوط في إعدادات البناء.";
             }
+
+            Class<?> sdkClass = Class.forName("sx.proxies.peer.ProxiesPeerSDK");
+
+            Object sdk = null;
+            try {
+                sdk = sdkClass.getMethod("getInstance").invoke(null);
+            } catch (Throwable ignored) {
+                sdk = null;
+            }
+
+            if (sdk == null) {
+                java.lang.reflect.Method init = null;
+                for (java.lang.reflect.Method method : sdkClass.getDeclaredMethods()) {
+                    if (method.getName().equals("init")
+                            && java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                            && method.getParameterTypes().length == 3) {
+                        init = method;
+                        break;
+                    }
+                }
+
+                if (init == null) {
+                    return "تعذر العثور على دالة تهيئة SDK.";
+                }
+
+                Class<?> configClass = init.getParameterTypes()[2];
+                java.lang.reflect.Constructor<?> configConstructor = null;
+
+                for (java.lang.reflect.Constructor<?> constructor
+                        : configClass.getDeclaredConstructors()) {
+                    Class<?>[] types = constructor.getParameterTypes();
+                    if (types.length == 5
+                            && types[0] == String.class
+                            && types[1] == String.class
+                            && types[2] == String.class) {
+                        configConstructor = constructor;
+                        break;
+                    }
+                }
+
+                if (configConstructor == null) {
+                    return "تعذر العثور على إعدادات SDK المتوافقة.";
+                }
+
+                configConstructor.setAccessible(true);
+                Object config = configConstructor.newInstance(
+                        "https://api.proxies.sx/v1",
+                        null, null, null, null
+                );
+
+                init.setAccessible(true);
+                init.invoke(null, MainActivity.this.getApplicationContext(), key, config);
+                sdk = sdkClass.getMethod("getInstance").invoke(null);
+            }
+
+            if (sdk == null) {
+                return "لم يتم إنشاء جلسة SDK.";
+            }
+
+            sdkClass.getMethod("start").invoke(sdk);
+            return "تم إرسال طلب تشغيل Proxies.sx SDK.";
+        } catch (Throwable error) {
+            Throwable cause = error;
+            while (cause.getCause() != null) cause = cause.getCause();
+            String message = cause.getMessage();
+            return "تعذر تشغيل SDK: " +
+                    (message == null ? cause.getClass().getSimpleName() : message);
+        }
+    }
+
+    @JavascriptInterface
+    public String stop() {
+        try {
+            sx.proxies.peer.ProxiesPeerSDK.getInstance().stop();
+            return "تم إرسال طلب إيقاف SDK.";
+        } catch (Exception e) {
+            return "SDK غير مهيأ أو متوقف.";
         }
     }
 

@@ -12,3 +12,5 @@ backups/
 backup-*/
 data/
 reports/
+local.properties
+.env
