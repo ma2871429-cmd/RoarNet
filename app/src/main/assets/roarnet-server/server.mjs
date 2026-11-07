@@ -176,6 +176,27 @@ db.exec(`
 }
 // END ROARNET_AUTOMATIC_PARTICIPANT_DEVICE_REGISTRATION_V1
 
+// ROARNET_PROXIES_DEVICE_TEST_RECORDS_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS proxies_device_test_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    connection_type TEXT NOT NULL
+      CHECK(connection_type IN ('personal_sim','personal_home')),
+    device_ownership_confirmed INTEGER NOT NULL CHECK(device_ownership_confirmed=1),
+    connection_ownership_confirmed INTEGER NOT NULL CHECK(connection_ownership_confirmed=1),
+    no_shared_or_hosted_connection INTEGER NOT NULL CHECK(no_shared_or_hosted_connection=1),
+    sdk_version TEXT NOT NULL,
+    sdk_status TEXT NOT NULL,
+    sdk_is_running INTEGER NOT NULL CHECK(sdk_is_running IN (0,1)),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_proxies_device_tests_node_created
+    ON proxies_device_test_records(node_id, created_at DESC);
+`);
+// END ROARNET_PROXIES_DEVICE_TEST_RECORDS_V1
+
 // ROARNET_PROVIDER_DEVICE_BINDINGS_V1
 db.exec(`
   CREATE TABLE IF NOT EXISTS provider_device_bindings (
@@ -2756,6 +2777,117 @@ const server = http.createServer(async (req, res) => {
         revokedAt
       });
     }
+
+
+    // ROARNET_PROXIES_DEVICE_TEST_API_V1
+    const proxiesDeviceTestPath = '/api/participant/device/proxies-test';
+
+    if (url.pathname === proxiesDeviceTestPath &&
+        req.method === 'GET') {
+      const auth = await participantDeviceFor(
+        req, url.searchParams.get('deviceId')
+      );
+
+      if (auth.error) {
+        const status = auth.error === 'PARTICIPANT_SESSION_INVALID' ? 401 :
+          auth.error === 'DEVICE_ID_REQUIRED' ? 400 : 403;
+        return json(res, status, { error: auth.error });
+      }
+
+      const records = db.prepare(`
+        SELECT id,connection_type,device_ownership_confirmed,
+               connection_ownership_confirmed,no_shared_or_hosted_connection,
+               sdk_version,sdk_status,sdk_is_running,created_at
+        FROM proxies_device_test_records
+        WHERE node_id=?
+        ORDER BY created_at DESC,id DESC
+        LIMIT 20
+      `).all(auth.device.id);
+
+      return json(res, 200, {
+        ok: true,
+        device: {
+          id: auth.device.id,
+          label: auth.device.label,
+          status: auth.device.status
+        },
+        records
+      });
+    }
+
+    if (url.pathname === proxiesDeviceTestPath &&
+        req.method === 'POST') {
+      const data = await body(req);
+      const auth = await participantDeviceFor(req, data.deviceId);
+
+      if (auth.error) {
+        const status = auth.error === 'PARTICIPANT_SESSION_INVALID' ? 401 :
+          auth.error === 'DEVICE_ID_REQUIRED' ? 400 : 403;
+        return json(res, status, { error: auth.error });
+      }
+
+      const connectionType = String(data.connectionType || '').trim();
+      const sdkVersion = String(data.sdkVersion || '').trim();
+      const sdkStatus = String(data.sdkStatus || '').trim();
+
+      if (!['personal_sim', 'personal_home'].includes(connectionType)) {
+        return json(res, 400, { error: 'INVALID_CONNECTION_TYPE' });
+      }
+
+      if (data.deviceOwnershipConfirmed !== true ||
+          data.connectionOwnershipConfirmed !== true ||
+          data.noSharedOrHostedConnection !== true) {
+        return json(res, 400, {
+          error: 'ALL_DEVICE_AND_CONNECTION_DECLARATIONS_REQUIRED'
+        });
+      }
+
+      if (sdkVersion !== '1.3.2') {
+        return json(res, 400, {
+          error: 'UNSUPPORTED_SDK_VERSION',
+          expectedSdkVersion: '1.3.2'
+        });
+      }
+
+      const allowedSdkStatuses = [
+        'NOT_INITIALIZED', 'UNKNOWN', 'STOPPED',
+        'CONNECTING', 'CONNECTED', 'ERROR'
+      ];
+
+      if (!allowedSdkStatuses.includes(sdkStatus) ||
+          typeof data.sdkIsRunning !== 'boolean') {
+        return json(res, 400, { error: 'INVALID_SDK_STATUS' });
+      }
+
+      const createdAt = now();
+
+      const result = db.prepare(`
+        INSERT INTO proxies_device_test_records (
+          node_id,connection_type,
+          device_ownership_confirmed,connection_ownership_confirmed,
+          no_shared_or_hosted_connection,
+          sdk_version,sdk_status,sdk_is_running,created_at
+        ) VALUES (?,?,1,1,1,?,?,?,?)
+      `).run(
+        auth.device.id,
+        connectionType,
+        sdkVersion,
+        sdkStatus,
+        data.sdkIsRunning ? 1 : 0,
+        createdAt
+      );
+
+      return json(res, 201, {
+        ok: true,
+        recordId: Number(result.lastInsertRowid),
+        deviceId: auth.device.id,
+        createdAt,
+        sdkVersion,
+        sdkStatus,
+        sdkIsRunning: data.sdkIsRunning
+      });
+    }
+    // END ROARNET_PROXIES_DEVICE_TEST_API_V1
 
     if (req.method === 'POST' && url.pathname === '/api/meter') {
       const node = nodeFor(req);

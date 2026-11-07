@@ -4,6 +4,11 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.net.Uri;
+import android.widget.Button;
+import android.net.NetworkRequest;
+import android.net.NetworkCapabilities;
+import android.net.Network;
+import android.net.ConnectivityManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.JavascriptInterface;
@@ -39,6 +44,10 @@ public class MainActivity extends Activity {
     private RewardedAd rewardedAd;
     private static final String ADMOB_AD_UNIT = "ca-app-pub-9782709035691744/3906285447";
     private String pendingAuthCode;
+    private ConnectivityManager networkManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private volatile Network selectedNetwork;
+    private boolean applicationStarted;
 
     private native int startNode(
         String scriptPath,
@@ -54,12 +63,13 @@ public class MainActivity extends Activity {
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        MobileAds.initialize(this, status -> {});
-        loadRewardedAd();
         captureAuthCode(getIntent());
-        showMessage("🦁 RoarNet", "جاري تشغيل خادم RoarNet المحلي...");
+        showMessage("🦁 RoarNet", "اختر شبكة الاتصال...");
+        selectNetworkAndStart(() -> {
+            MobileAds.initialize(this, status -> {});
+            loadRewardedAd();
 
-        new Thread(() -> {
+            new Thread(() -> {
             try {
                 File root = new File(getFilesDir(), "roarnet-server");
                 if (!root.exists() && !root.mkdirs()) {
@@ -169,6 +179,175 @@ public class MainActivity extends Activity {
                     .show());
             }
         }, "RoarNet-Setup").start();
+        });
+    }
+
+
+    // ROARNET_PROCESS_NETWORK_SELECTION_V1
+    private void releaseSelectedNetwork() {
+        if (networkManager != null) {
+            if (networkCallback != null) {
+                try {
+                    networkManager.unregisterNetworkCallback(networkCallback);
+                } catch (Exception ignored) {}
+            }
+
+            try {
+                networkManager.bindProcessToNetwork(null);
+            } catch (Exception ignored) {}
+        }
+
+        networkCallback = null;
+        networkManager = null;
+        selectedNetwork = null;
+    }
+
+    private void selectNetworkAndStart(Runnable startApplication) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(24, 24, 24, 20);
+        panel.setBackgroundColor(Color.WHITE);
+
+        TextView title = new TextView(this);
+        title.setText("اختر شبكة اتصال RoarNet");
+        title.setTextSize(21);
+        title.setTextColor(Color.BLACK);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(8, 8, 8, 20);
+        panel.addView(title);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setView(panel)
+            .setCancelable(false)
+            .create();
+
+        Runnable automatic = () -> {
+            releaseSelectedNetwork();
+            dialog.dismiss();
+
+            if (!applicationStarted) {
+                applicationStarted = true;
+                startApplication.run();
+            }
+        };
+
+        java.util.function.IntConsumer choose = transport -> {
+            ConnectivityManager cm =
+                (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+
+            if (cm == null) {
+                showMessage("RoarNet", "تعذر الوصول إلى مدير الشبكات.");
+                return;
+            }
+
+            releaseSelectedNetwork();
+
+            NetworkRequest request = new NetworkRequest.Builder()
+                .addTransportType(transport)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build();
+
+            ConnectivityManager.NetworkCallback callback =
+                new ConnectivityManager.NetworkCallback() {
+                    @Override
+                    public void onAvailable(Network network) {
+                        boolean bound = cm.bindProcessToNetwork(network);
+
+                        if (!bound) {
+                            runOnUiThread(() ->
+                                showMessage("RoarNet",
+                                    "تعذر ربط الشبكة المختارة."));
+                            return;
+                        }
+
+                        selectedNetwork = network;
+
+                        runOnUiThread(() -> {
+                            if (dialog.isShowing()) {
+                                dialog.dismiss();
+                            }
+
+                            if (!applicationStarted) {
+                                applicationStarted = true;
+                                startApplication.run();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onLost(Network network) {
+                        if (network.equals(selectedNetwork)) {
+                            cm.bindProcessToNetwork(null);
+                            selectedNetwork = null;
+
+                            runOnUiThread(() ->
+                                showMessage("RoarNet",
+                                    "انقطع اتصال الشبكة المختارة. "
+                                    + "يجري انتظار توفر الاتصال مجدداً."));
+                        }
+                    }
+
+                    @Override
+                    public void onUnavailable() {
+                        runOnUiThread(() -> {
+                            releaseSelectedNetwork();
+                            showMessage("RoarNet",
+                                "الشبكة غير متاحة. تحقق من الاتصال وحاول مجدداً.");
+                        });
+                    }
+                };
+
+            networkManager = cm;
+            networkCallback = callback;
+
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    cm.requestNetwork(request, callback, 30000);
+                } else {
+                    cm.requestNetwork(request, callback);
+                }
+            } catch (Exception e) {
+                releaseSelectedNetwork();
+                showMessage("RoarNet",
+                    "تعذر طلب الشبكة: " + e.getMessage());
+            }
+        };
+
+        Button wifi = new Button(this);
+        wifi.setText("📶\nWi-Fi");
+        wifi.setAllCaps(false);
+        wifi.setTextSize(17);
+        wifi.setMinHeight(120);
+
+        Button sim = new Button(this);
+        sim.setText("▦\nSIM");
+        sim.setAllCaps(false);
+        sim.setTextSize(17);
+        sim.setMinHeight(120);
+
+        LinearLayout.LayoutParams params =
+            new LinearLayout.LayoutParams(0, 120, 1f);
+        params.setMargins(5, 5, 5, 5);
+        row.addView(wifi, params);
+        row.addView(sim, params);
+        panel.addView(row);
+
+        Button auto = new Button(this);
+        auto.setText("تلقائي - الشبكة الافتراضية");
+        auto.setAllCaps(false);
+        panel.addView(auto);
+
+        wifi.setOnClickListener(v ->
+            choose.accept(NetworkCapabilities.TRANSPORT_WIFI));
+        sim.setOnClickListener(v ->
+            choose.accept(NetworkCapabilities.TRANSPORT_CELLULAR));
+        auto.setOnClickListener(v -> automatic.run());
+
+        dialog.show();
     }
 
     private void copyAsset(String assetName, File destination)
@@ -318,6 +497,33 @@ private final class RoarNetProxiesSDKBridge {
     }
 
     @JavascriptInterface
+    public String status() {
+        try {
+            sx.proxies.peer.ProxiesPeerSDK sdk =
+                sx.proxies.peer.ProxiesPeerSDK.getInstance();
+
+            if (sdk == null) return "NOT_INITIALIZED";
+
+            Object current = sdk.getStatus();
+            return current == null ? "UNKNOWN" : current.toString();
+        } catch (Throwable error) {
+            return "ERROR";
+        }
+    }
+
+    @JavascriptInterface
+    public boolean isRunning() {
+        try {
+            sx.proxies.peer.ProxiesPeerSDK sdk =
+                sx.proxies.peer.ProxiesPeerSDK.getInstance();
+
+            return sdk != null && sdk.isRunning();
+        } catch (Throwable error) {
+            return false;
+        }
+    }
+
+    @JavascriptInterface
     public String stop() {
         try {
             sx.proxies.peer.ProxiesPeerSDK.getInstance().stop();
@@ -372,6 +578,8 @@ private final class RoarNetProxiesSDKBridge {
 
             if ("WARN".equalsIgnoreCase(level)) {
                 android.util.Log.w("RoarNetSpider", entry);
+            } else if ("INFO".equalsIgnoreCase(level)) {
+                android.util.Log.i("RoarNetSpider", entry);
             } else {
                 android.util.Log.e("RoarNetSpider", entry);
             }
@@ -612,6 +820,12 @@ private final class RoarNetProxiesSDKBridge {
         // /ROARNET_ADMIN_FINANCE_BRIDGE_V1
     }
     // /ROARNET_ANDROID_ADMIN_BRIDGE_V1
+
+    @Override
+    protected void onDestroy() {
+        releaseSelectedNetwork();
+        super.onDestroy();
+    }
 
     @Override
     protected void onNewIntent(Intent intent) {

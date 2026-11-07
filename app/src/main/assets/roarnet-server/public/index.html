@@ -1111,6 +1111,62 @@ select {
     </div>
   </div>
 
+  <!-- ROARNET_PROXIES_DEVICE_TEST_UI_V1 -->
+  <section id="rn-proxies-device-test" hidden
+    style="margin-top:20px;padding:16px;border:1px solid #2788bd;border-radius:14px;background:#0b2033;color:#effaff">
+    <h3>اختبار تسجيل الجهاز — Proxies.sx</h3>
+    <p style="font-size:13px;line-height:1.8;color:#a9c4d5">
+      سجّل معلومات الجهاز والاتصال لطلب مراجعة تسجيل جهازين. هذا الاختبار يقرأ حالة SDK فقط ولا يبدأ المشاركة أو يولّد ترافيكاً.
+    </p>
+
+    <label for="rn-proxies-test-connection">نوع اتصال هذا الجهاز</label>
+    <select id="rn-proxies-test-connection"
+      style="display:block;width:100%;padding:11px;margin:8px 0 14px;background:#10283a;color:#effaff;border:1px solid #176078;border-radius:9px">
+      <option value="">اختر نوع الاتصال</option>
+      <option value="personal_sim">شريحة SIM شخصية</option>
+      <option value="personal_home">خط إنترنت منزلي خاص</option>
+    </select>
+
+    <label style="display:flex;gap:9px;align-items:center;margin:12px 0">
+      <input id="rn-proxies-test-device-owner" type="checkbox">
+      أؤكد أن هذا الهاتف ملكي الشخصي.
+    </label>
+
+    <label style="display:flex;gap:9px;align-items:center;margin:12px 0">
+      <input id="rn-proxies-test-connection-owner" type="checkbox">
+      أؤكد أن اتصال الإنترنت المستخدم خاص بي.
+    </label>
+
+    <label style="display:flex;gap:9px;align-items:center;margin:12px 0">
+      <input id="rn-proxies-test-no-shared" type="checkbox">
+      أؤكد أن الاتصال ليس مشتركاً أو مستضافاً.
+    </label>
+
+    <div id="rn-proxies-test-sdk"
+      style="margin:14px 0;padding:12px;border-radius:9px;background:#10283a;line-height:1.9">
+      حالة SDK: جارٍ الفحص...
+    </div>
+
+    <p id="rn-proxies-test-status" role="status" aria-live="polite"
+      style="font-size:13px;color:#13dfd0"></p>
+
+    <button id="rn-proxies-test-save" type="button"
+      style="padding:11px 15px;border:0;border-radius:9px;background:#13dfd0;color:#04101f;font-weight:bold">
+      حفظ نتيجة الاختبار
+    </button>
+
+    <button id="rn-proxies-test-copy" type="button"
+      style="padding:11px 15px;margin-inline-start:6px;border:1px solid #176078;border-radius:9px;background:#10283a;color:#effaff">
+      نسخ تقرير مايا
+    </button>
+
+    <h4 style="margin-top:20px">سجل اختبارات هذا الجهاز</h4>
+    <div id="rn-proxies-test-history" style="line-height:1.9">
+      لم يتم تحميل السجل بعد.
+    </div>
+  </section>
+  <!-- /ROARNET_PROXIES_DEVICE_TEST_UI_V1 -->
+
   <div id="rn-wallet-finance" style="margin-top:24px;padding-top:18px;border-top:1px solid #176078">
     <h3>محفظتي وأرباحي</h3>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
@@ -1199,6 +1255,34 @@ window.RoarNetDiagnostics = {
         );
       }
     } catch (_) {}
+  },
+
+  captureProxiesSDKStatus() {
+    try {
+      const bridge = window.RoarNetProxiesSDK;
+
+      if (!bridge) {
+        this.capture('WARN', 'ProxiesSDK', 'Native bridge unavailable', 0);
+        return;
+      }
+
+      const status = String(bridge.status() || 'UNKNOWN');
+      const running = !!bridge.isRunning();
+
+      this.capture(
+        'INFO',
+        'ProxiesSDK',
+        'status=' + status + '; isRunning=' + running,
+        0
+      );
+    } catch (error) {
+      this.capture(
+        'ERROR',
+        'ProxiesSDK status',
+        error?.message || String(error),
+        0
+      );
+    }
   }
 };
 
@@ -1270,6 +1354,7 @@ async function walletRequest(path, options = {}) {
 
 
 let selectedDeviceId = '';
+let rnWalletDevices = [];
   let rnRelayActiveDeviceId = '';
 
 
@@ -1391,7 +1476,15 @@ async function loadProviderConsent(provider, prefix, label) {
 }
 
 async function loadProxiesConsent() {
-  return loadProviderConsent('proxies_sx', 'proxies', 'Proxies.sx');
+  const result = await loadProviderConsent(
+    'proxies_sx', 'proxies', 'Proxies.sx'
+  );
+
+  if (window.RoarNetDiagnostics?.captureProxiesSDKStatus) {
+    window.RoarNetDiagnostics.captureProxiesSDKStatus();
+  }
+
+  return result;
 }
 
 async function loadAllDeviceConsents() {
@@ -1486,6 +1579,234 @@ async function loadWalletEarnings() {
   }
 }
 
+
+// ROARNET_PROXIES_DEVICE_TEST_LOGIC_V1
+function readProxiesDeviceTestSDK() {
+  const bridge = window.RoarNetProxiesSDK;
+  if (!bridge ||
+      typeof bridge.status !== 'function' ||
+      typeof bridge.isRunning !== 'function') {
+    throw new Error('Native Proxies SDK bridge is unavailable.');
+  }
+
+  const status = String(bridge.status() || 'UNKNOWN');
+  const isRunning = Boolean(bridge.isRunning());
+
+  const allowed = [
+    'NOT_INITIALIZED', 'UNKNOWN', 'STOPPED',
+    'CONNECTING', 'CONNECTED', 'ERROR'
+  ];
+
+  if (!allowed.includes(status)) {
+    throw new Error('Unrecognized SDK status: ' + status);
+  }
+
+  return {
+    sdkVersion: '1.3.2',
+    sdkStatus: status,
+    sdkIsRunning: isRunning
+  };
+}
+
+function renderProxiesDeviceTestHistory(records) {
+  const box = document.getElementById('rn-proxies-test-history');
+  box.replaceChildren();
+
+  if (!Array.isArray(records) || !records.length) {
+    box.textContent = 'لا توجد اختبارات محفوظة لهذا الجهاز حتى الآن.';
+    return;
+  }
+
+  for (const record of records) {
+    const card = document.createElement('article');
+    card.style.cssText =
+      'padding:11px;margin:8px 0;border:1px solid #176078;border-radius:9px;background:#10283a';
+
+    const details = [
+      'التاريخ: ' + String(record.created_at || '—'),
+      'الاتصال: ' + (
+        record.connection_type === 'personal_sim'
+          ? 'Personal SIM'
+          : record.connection_type === 'personal_home'
+            ? 'Personal home internet'
+            : String(record.connection_type || '—')
+      ),
+      'SDK: ' + String(record.sdk_version || '—'),
+      'الحالة: ' + String(record.sdk_status || '—'),
+      'isRunning: ' + (Number(record.sdk_is_running) === 1 ? 'true' : 'false')
+    ];
+
+    for (const line of details) {
+      const item = document.createElement('div');
+      item.textContent = line;
+      card.appendChild(item);
+    }
+
+    box.appendChild(card);
+  }
+}
+
+async function loadProxiesDeviceTest() {
+  const panel = document.getElementById('rn-proxies-device-test');
+  const state = document.getElementById('rn-proxies-test-status');
+  const sdkBox = document.getElementById('rn-proxies-test-sdk');
+  const historyBox = document.getElementById('rn-proxies-test-history');
+
+  if (!selectedDeviceId) {
+    panel.hidden = true;
+    return;
+  }
+
+  panel.hidden = false;
+  state.textContent = '';
+  sdkBox.textContent = 'جارٍ قراءة حالة SDK...';
+
+  let historyError = null;
+  let sdkError = null;
+
+  // Load server history independently from the native SDK bridge.
+  try {
+    const data = await walletRequest(
+      '/api/participant/device/proxies-test?deviceId=' +
+      encodeURIComponent(selectedDeviceId)
+    );
+    renderProxiesDeviceTestHistory(data.records || []);
+  } catch (error) {
+    historyError = error;
+    historyBox.textContent = 'تعذر تحميل سجل الاختبارات: ' + error.message;
+  }
+
+  // Read SDK state independently; never invent a fallback status.
+  try {
+    const sdk = readProxiesDeviceTestSDK();
+    sdkBox.textContent =
+      'SDK dependency version (build): ' + sdk.sdkVersion +
+      ' — Status (device-reported): ' + sdk.sdkStatus +
+      ' — isRunning (device-reported): ' + sdk.sdkIsRunning;
+  } catch (error) {
+    sdkError = error;
+    sdkBox.textContent = 'تعذرت قراءة حالة SDK: ' + error.message;
+  }
+
+  if (historyError) {
+    state.textContent = 'تعذر تحميل السجل من السيرفر.';
+  } else if (sdkError) {
+    state.textContent =
+      'تم تحميل سجل الاختبارات. حالة SDK غير متاحة حالياً.';
+  } else {
+    state.textContent = 'تم تحميل سجل الاختبارات وقراءة حالة SDK.';
+  }
+}
+
+function buildProxiesMayaReport() {
+  if (!selectedDeviceId) {
+    throw new Error('اختر جهازاً أولاً.');
+  }
+
+  const device = rnWalletDevices.find(
+    item => String(item.id) === String(selectedDeviceId)
+  );
+
+  if (!device) {
+    throw new Error('تعذر العثور على بيانات الجهاز.');
+  }
+
+  const sdk = readProxiesDeviceTestSDK();
+  const connectionType =
+    document.getElementById('rn-proxies-test-connection').value;
+
+  if (!connectionType) {
+    throw new Error('اختر نوع اتصال الجهاز.');
+  }
+
+  const deviceOwner =
+    document.getElementById('rn-proxies-test-device-owner').checked;
+  const connectionOwner =
+    document.getElementById('rn-proxies-test-connection-owner').checked;
+  const noShared =
+    document.getElementById('rn-proxies-test-no-shared').checked;
+
+  if (!deviceOwner || !connectionOwner || !noShared) {
+    throw new Error('يجب تأكيد الإقرارات الثلاثة قبل الحفظ.');
+  }
+
+  const connectionLabel = connectionType === 'personal_sim'
+    ? 'Personal SIM connection'
+    : 'Personal home internet connection';
+
+  const timestamp = new Date().toISOString();
+
+  return {
+    payload: {
+      deviceId: selectedDeviceId,
+      connectionType,
+      deviceOwnershipConfirmed: deviceOwner,
+      connectionOwnershipConfirmed: connectionOwner,
+      noSharedOrHostedConnection: noShared,
+      sdkVersion: sdk.sdkVersion,
+      sdkStatus: sdk.sdkStatus,
+      sdkIsRunning: sdk.sdkIsRunning
+    },
+    report: [
+      'RoarNet — Proxies.sx Device Registration Test',
+      'Device ID: ' + selectedDeviceId,
+      'Device label: ' + String(device.label || 'Android device'),
+      'Device registration date: ' + String(device.created_at || 'Not available'),
+      'Device status: ' + String(device.status || 'Not available'),
+      'Connection type: ' + connectionLabel,
+      'Device ownership confirmed: Yes',
+      'Connection ownership confirmed: Yes',
+      'No shared or hosted connection: Confirmed by participant',
+      'SDK version: ' + sdk.sdkVersion,
+      'SDK status (device-reported): ' + sdk.sdkStatus,
+      'SDK isRunning (device-reported): ' + sdk.sdkIsRunning,
+      'Test timestamp (UTC): ' + timestamp,
+      'Note: SDK status is reported by the device and is not confirmation of provider activation.',
+      'Note: This test only reads SDK status. No traffic generation or commercial sharing was initiated.'
+    ].join('\n')
+  };
+}
+
+document.getElementById('rn-proxies-test-save')
+  .addEventListener('click', async () => {
+    const state = document.getElementById('rn-proxies-test-status');
+    const button = document.getElementById('rn-proxies-test-save');
+
+    button.disabled = true;
+    state.textContent = 'جارٍ التحقق وحفظ نتيجة الاختبار...';
+
+    try {
+      const result = buildProxiesMayaReport();
+
+      await walletRequest('/api/participant/device/proxies-test', {
+        method: 'POST',
+        body: JSON.stringify(result.payload)
+      });
+
+      state.textContent = 'تم حفظ نتيجة الاختبار لهذا الجهاز.';
+      await loadProxiesDeviceTest();
+    } catch (error) {
+      state.textContent = 'تعذر حفظ الاختبار: ' + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+document.getElementById('rn-proxies-test-copy')
+  .addEventListener('click', async () => {
+    const state = document.getElementById('rn-proxies-test-status');
+
+    try {
+      const result = buildProxiesMayaReport();
+      await navigator.clipboard.writeText(result.report);
+      state.textContent = 'تم نسخ تقرير الجهاز. يمكنك إرساله إلى مايا.';
+    } catch (error) {
+      state.textContent = 'تعذر إنشاء أو نسخ التقرير: ' + error.message;
+    }
+  });
+// END ROARNET_PROXIES_DEVICE_TEST_LOGIC_V1
+
+
 async function loadWallet() {
   const { data: { session } } = await supabase.auth.getSession();
   wallet.hidden = !session?.user;
@@ -1574,6 +1895,8 @@ async function loadWallet() {
       ? result
       : (result.devices || result.items || result.nodes || result.data?.devices || []);
 
+    rnWalletDevices = devices;
+
     const previous = selectedDeviceId || select.value;
 
     devicesBox.replaceChildren();
@@ -1607,7 +1930,12 @@ async function loadWallet() {
       status.style.color = '#9bb7c9';
       status.textContent = 'الحالة: ' + (device.status || 'مسجل');
 
-      row.append(name, status);
+      const registered = document.createElement('div');
+      registered.style.cssText = 'font-size:12px;color:#9bb7c9';
+      registered.textContent = 'تاريخ التسجيل: ' +
+        (device.created_at || 'غير متوفر');
+
+      row.append(name, status, registered);
       devicesBox.appendChild(row);
     }
 
@@ -1636,6 +1964,7 @@ async function loadWallet() {
     select.value = selectedDeviceId;
 
     await loadAllDeviceConsents();
+    await loadProxiesDeviceTest();
     walletStatus.textContent = 'تم تحديث الأجهزة والموافقات.';
   } catch (error) {
     walletStatus.textContent = error.message;
@@ -1647,9 +1976,11 @@ document.getElementById('rn-wallet-device-select')
     selectedDeviceId = event.target.value;
     if (selectedDeviceId) {
       await loadAllDeviceConsents();
+      await loadProxiesDeviceTest();
     } else {
       document.getElementById('rn-consent').hidden = true;
       document.getElementById('rn-proxies-consent').hidden = true;
+      document.getElementById('rn-proxies-device-test').hidden = true;
     }
   });
 
