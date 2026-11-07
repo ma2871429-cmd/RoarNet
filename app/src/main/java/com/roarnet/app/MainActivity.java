@@ -35,6 +35,8 @@ import org.json.JSONObject;
 import com.google.android.gms.ads.MobileAds;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.AdError;
+import com.google.android.gms.ads.FullScreenContentCallback;
 import com.google.android.gms.ads.rewarded.RewardedAd;
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 
@@ -42,7 +44,9 @@ public class MainActivity extends Activity {
     private static final String LOCAL_URL = "http://127.0.0.1:3180/";
     private WebView web;
     private RewardedAd rewardedAd;
-    private static final String ADMOB_AD_UNIT = "ca-app-pub-9782709035691744/3906285447";
+    private boolean rewardedAdLoading;
+    // Google official test rewarded ad unit. Replace only after policy approval.
+    private static final String ADMOB_AD_UNIT = "ca-app-pub-3940256099942544/5224354917";
     private String pendingAuthCode;
     private ConnectivityManager networkManager;
     private ConnectivityManager.NetworkCallback networkCallback;
@@ -1072,29 +1076,96 @@ private final class RoarNetProxiesSDKBridge {
         }
     }
 
-    // ===== AdMob Rewarded - RoarNet =====
-    private void loadRewardedAd() {
-        AdRequest adRequest = new AdRequest.Builder().build();
-        RewardedAd.load(this, ADMOB_AD_UNIT, adRequest, new RewardedAdLoadCallback() {
-            @Override public void onAdFailedToLoad(LoadAdError err) { rewardedAd = null; }
-            @Override public void onAdLoaded(RewardedAd ad) { rewardedAd = ad; }
-        });
-    }
-    private void showRewardedAd() {
+    // ===== RoarNet AdMob Rewarded - TEST MODE =====
+    private void notifyAdPage(String status) {
         runOnUiThread(() -> {
-            if (rewardedAd != null) {
-                rewardedAd.show(MainActivity.this, reward -> {
-                    rewardedAd = null;
-                    loadRewardedAd();
-                    if (web != null) web.evaluateJavascript("javascript:onAdRewarded()", null);
-                });
-            } else {
-                loadRewardedAd();
-                if (web != null) web.evaluateJavascript("javascript:onAdRewarded()", null);
+            if (web != null) {
+                String safe = JSONObject.quote(status);
+                web.evaluateJavascript(
+                    "if(window.onAdStatus)window.onAdStatus(" + safe + ");",
+                    null
+                );
             }
         });
     }
+
+    private void loadRewardedAd() {
+        runOnUiThread(() -> {
+            if (rewardedAd != null || rewardedAdLoading || isFinishing()) return;
+
+            rewardedAdLoading = true;
+            AdRequest request = new AdRequest.Builder().build();
+
+            RewardedAd.load(
+                MainActivity.this,
+                ADMOB_AD_UNIT,
+                request,
+                new RewardedAdLoadCallback() {
+                    @Override
+                    public void onAdFailedToLoad(LoadAdError error) {
+                        rewardedAd = null;
+                        rewardedAdLoading = false;
+                        notifyAdPage("تعذر تحميل الإعلان التجريبي. حاول لاحقاً.");
+                    }
+
+                    @Override
+                    public void onAdLoaded(RewardedAd ad) {
+                        rewardedAd = ad;
+                        rewardedAdLoading = false;
+                        notifyAdPage("الإعلان التجريبي جاهز للمشاهدة.");
+                    }
+                }
+            );
+        });
+    }
+
+    private void showRewardedAd() {
+        runOnUiThread(() -> {
+            if (isFinishing()) return;
+
+            if (rewardedAd == null) {
+                notifyAdPage(
+                    rewardedAdLoading
+                        ? "الإعلان قيد التحميل."
+                        : "الإعلان غير جاهز حالياً. حاول بعد قليل."
+                );
+                loadRewardedAd();
+                return;
+            }
+
+            RewardedAd ad = rewardedAd;
+            rewardedAd = null;
+
+            ad.setFullScreenContentCallback(new FullScreenContentCallback() {
+                @Override
+                public void onAdShowedFullScreenContent() {
+                    notifyAdPage("بدأ عرض الإعلان التجريبي.");
+                }
+
+                @Override
+                public void onAdDismissedFullScreenContent() {
+                    notifyAdPage("انتهت مشاهدة الإعلان التجريبي. المكافآت معطّلة حالياً.");
+                    loadRewardedAd();
+                }
+
+                @Override
+                public void onAdFailedToShowFullScreenContent(AdError error) {
+                    notifyAdPage("تعذر عرض الإعلان التجريبي.");
+                    loadRewardedAd();
+                }
+            });
+
+            ad.show(MainActivity.this, reward -> {
+                // لا تُمنح Coins أو GB هنا. هذا اختبار عرض فقط.
+                notifyAdPage("اكتملت مشاهدة الإعلان التجريبي. لم تتم إضافة رصيد.");
+            });
+        });
+    }
+
     public class AndroidAdBridge {
-        @JavascriptInterface public void showRewarded() { showRewardedAd(); }
+        @JavascriptInterface
+        public void showRewarded() {
+            showRewardedAd();
+        }
     }
 }
