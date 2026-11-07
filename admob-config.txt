@@ -1,0 +1,6 @@
+App ID: ca-app-pub-9782709035691744~8751418011
+Ad Unit ID: ca-app-pub-9782709035691744/3906285447
+Ad Unit Name: RoarNet_Rewarded_Coins
+Reward: 10 Coins
+Max Per Day: 10
+Coins Per Dollar: 2000
