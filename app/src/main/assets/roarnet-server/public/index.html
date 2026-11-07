@@ -2510,5 +2510,31 @@ document.getElementById('rn-withdraw-submit')
 </section>
 <!-- END ROARNET_WITHDRAWAL_UI_V1 -->
 
+
+<!-- ===== RoarNet AdMob Rewarded ===== -->
+<div id="rn-reward" style="margin:20px auto;max-width:760px;background:#091d32;border:1px solid #164b62;border-radius:16px;padding:18px;text-align:center">
+  <div style="font-size:22px;font-weight:800">🦁 اربح كوينز مجاناً</div>
+  <div style="color:#9bb7c9;margin:8px 0">شاهد إعلان واحد واربح <b style="color:#13dfd0">+10 Coins</b> • حد أقصى 10 باليوم</div>
+  <div style="font-size:18px;margin:8px 0">رصيدك: <b id="rn-coins">0</b> Coins</div>
+  <button onclick="watchRewardAd()" style="background:#13dfd0;color:#04101f;border:0;border-radius:12px;padding:12px 22px;font-size:17px;font-weight:800;cursor:pointer">▶️ شاهد إعلان واربح 10</button>
+  <div id="rn-ad-msg" style="color:#9bb7c9;margin-top:10px;font-size:14px"></div>
+</div>
+<script>
+let rnCoins = parseInt(localStorage.getItem('rn_coins')||'0');
+function rnRenderCoins(){ var el=document.getElementById('rn-coins'); if(el) el.textContent = rnCoins; }
+function watchRewardAd(){
+  document.getElementById('rn-ad-msg').textContent = 'جاري تحميل الإعلان...';
+  if(window.AndroidAd){ window.AndroidAd.showRewarded(); }
+  else { setTimeout(onAdRewarded, 500); }
+}
+function onAdRewarded(){
+  rnCoins += 10;
+  localStorage.setItem('rn_coins', String(rnCoins));
+  rnRenderCoins();
+  document.getElementById('rn-ad-msg').textContent = 'تم! +10 Coins ✅ رصيدك الآن ' + rnCoins;
+}
+rnRenderCoins();
+</script>
+
 </body>
 </html>
