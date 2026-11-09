@@ -38,18 +38,22 @@ jobs:
         run: |
           CACHE="$HOME/.gradle/caches/modules-2/files-2.1/com.github.bolivian-peru/android-peer-sdk"
           AAR=$(find "$CACHE" -type f -name '*.aar' | head -1)
+
           if [ -z "$AAR" ]; then
             echo "SDK AAR NOT FOUND"
             exit 1
           fi
+
           mkdir -p sdk-report
           unzip -p "$AAR" classes.jar > sdk-report/classes.jar
           jar tf sdk-report/classes.jar > sdk-report/classes.txt
+
           while read -r CLASS; do
             NAME="${CLASS%.class}"
             NAME="${NAME//\//.}"
             javap -classpath sdk-report/classes.jar -public "$NAME" 2>/dev/null || true
           done < sdk-report/classes.txt > sdk-report/public-api.txt
+
           rm sdk-report/classes.jar
 
       - name: Upload SDK inspection report
