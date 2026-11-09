@@ -2,7 +2,9 @@ name: RoarNet Android Build
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, standalone-apk-integration, 'repair/**']
+  pull_request:
+    branches: [main, master, standalone-apk-integration]
   workflow_dispatch:
 
 permissions:
@@ -25,7 +27,7 @@ jobs:
         uses: android-actions/setup-android@v4
 
       - name: Install Android components
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865" "cmake;3.22.1"
 
       - name: Download Node.js C++ runtime
         run: |
@@ -46,14 +48,15 @@ jobs:
       - name: Package Node.js C++ runtime
         run: |
           mkdir -p app/src/main/jniLibs/arm64-v8a
-          cp "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" app/src/main/jniLibs/arm64-v8a/
+          cp "$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" app/src/main/jniLibs/arm64-v8a/
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
+
+      - name: Make Gradle Wrapper executable
+        run: chmod +x ./gradlew
 
       - name: Build APK
-        run: gradle --no-daemon assembleDebug --console=plain
+        run: ./gradlew --no-daemon :app:assembleDebug --console=plain
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
