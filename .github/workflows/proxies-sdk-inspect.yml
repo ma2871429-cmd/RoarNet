@@ -1,0 +1,59 @@
+name: RoarNet Proxies SDK Inspection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve Proxies SDK
+        env:
+          ORG_GRADLE_PROJECT_PROXIES_SDK_KEY: ${{ secrets.PROXIES_SDK_KEY }}
+        run: |
+          ./gradlew :app:dependencyInsight \
+            --dependency android-peer-sdk \
+            --configuration debugRuntimeClasspath \
+            --no-daemon --console=plain
+
+      - name: Extract SDK API
+        run: |
+          CACHE="$HOME/.gradle/caches/modules-2/files-2.1/com.github.bolivian-peru/android-peer-sdk"
+          AAR=$(find "$CACHE" -type f -name '*.aar' | head -1)
+          if [ -z "$AAR" ]; then
+            echo "SDK AAR NOT FOUND"
+            exit 1
+          fi
+          mkdir -p sdk-report
+          unzip -p "$AAR" classes.jar > sdk-report/classes.jar
+          jar tf sdk-report/classes.jar > sdk-report/classes.txt
+          while read -r CLASS; do
+            NAME="${CLASS%.class}"
+            NAME="${NAME//\//.}"
+            javap -classpath sdk-report/classes.jar -public "$NAME" 2>/dev/null || true
+          done < sdk-report/classes.txt > sdk-report/public-api.txt
+          rm sdk-report/classes.jar
+
+      - name: Upload SDK inspection report
+        uses: actions/upload-artifact@v4
+        with:
+          name: roarnet-proxies-sdk-report
+          path: sdk-report/
