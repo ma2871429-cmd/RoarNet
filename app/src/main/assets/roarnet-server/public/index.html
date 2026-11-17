@@ -1879,8 +1879,56 @@ document.getElementById('rn-withdraw-submit')
 
 </script>
 
+<section id="rn-admin-gate" hidden style="max-width:520px;margin:20px auto;padding:20px;border:1px solid #8b6b2d;border-radius:16px;background:#201d16;color:#fff4d6;text-align:right">
+  <h3>دخول الأدمن</h3>
+  <p>هذه الصفحة للأدمن فقط. أدخل توكن الأدمن للمتابعة.</p>
+  <input id="rn-admin-token-input" type="password" dir="ltr" placeholder="ADMIN_TOKEN" style="width:100%;padding:10px;border-radius:8px" autocomplete="off">
+  <button id="rn-admin-login-btn" type="button" style="margin-top:10px;padding:10px 16px;border-radius:8px">دخول كأدمن</button>
+  <p id="rn-admin-gate-status" role="status"></p>
+  <button id="rn-admin-logout-btn" type="button" hidden>خروج من الأدمن</button>
+</section>
+<script>
+(function(){
+  var gate=document.getElementById('rn-admin-gate');
+  var tokenInput=document.getElementById('rn-admin-token-input');
+  var loginBtn=document.getElementById('rn-admin-login-btn');
+  var logoutBtn=document.getElementById('rn-admin-logout-btn');
+  var statusBox=document.getElementById('rn-admin-gate-status');
+  var adminSections=['rn-admin-link-code','rn-admin-finance','rn-admin-withdrawals'];
+  function showAdmin(show){
+    adminSections.forEach(function(id){ var el=document.getElementById(id); if(el) el.hidden=!show; });
+    if(logoutBtn) logoutBtn.hidden=!show;
+    if(tokenInput) tokenInput.style.display=show?'none':'block';
+    if(loginBtn) loginBtn.style.display=show?'none':'block';
+  }
+  function isAdminPage(){ return location.pathname==='/admin'; }
+  function getToken(){ try{ return sessionStorage.getItem('rn_admin_token')||''; }catch(e){ return ''; } }
+  // اذا انت بصفحة /admin و ماكو توكن، اظهر البوابة فقط و اخفي كل شي ادمن
+  if(isAdminPage()){
+    if(gate) gate.hidden=false;
+    showAdmin(!!getToken());
+    if(getToken() && statusBox) statusBox.textContent='تم تسجيل دخول الأدمن.';
+  } else {
+    if(gate) gate.hidden=true;
+    showAdmin(false);
+  }
+  if(loginBtn) loginBtn.addEventListener('click', async function(){
+    var tok=(tokenInput&&tokenInput.value||'').trim();
+    if(!tok){ if(statusBox) statusBox.textContent='أدخل التوكن أولاً.'; return; }
+    try{
+      var r=await fetch('/api/admin/provider/status',{headers:{'Authorization':'Bearer '+tok}});
+      if(r.status===401){ if(statusBox) statusBox.textContent='توكن غير صحيح.'; showAdmin(false); return; }
+      try{ sessionStorage.setItem('rn_admin_token',tok); }catch(e){}
+      if(statusBox) statusBox.textContent='تم الدخول كأدمن.';
+      showAdmin(true);
+    }catch(e){ if(statusBox) statusBox.textContent='فشل الاتصال بالسيرفر.'; }
+  });
+  if(logoutBtn) logoutBtn.addEventListener('click', function(){ try{ sessionStorage.removeItem('rn_admin_token'); }catch(e){} showAdmin(false); if(statusBox) statusBox.textContent='تم تسجيل الخروج.'; });
+})();
+</script>
+
 <!-- ROARNET_ADMIN_LINK_CODE_UI_V1 -->
-<section id="rn-admin-link-code" style="max-width:520px;margin:20px auto;padding:20px;border:1px solid #8b6b2d;border-radius:16px;background:#201d16;color:#fff4d6;text-align:right">
+<section id="rn-admin-link-code" hidden style="max-width:520px;margin:20px auto;padding:20px;border:1px solid #8b6b2d;border-radius:16px;background:#201d16;color:#fff4d6;text-align:right">
   <h2>إدارة ربط المشاركين</h2>
   <p>أدخل معرّف العقدة النشطة لإصدار رمز ربط مؤقت.</p>
   <input id="rn-admin-node-id" type="text" dir="ltr"
@@ -2113,8 +2161,7 @@ document.getElementById('rn-withdraw-submit')
 
   if (!panel || !window.RoarNetAdmin) return;
 
-  panel.hidden = false;
-
+  // لا تظهر المالية الا بعد دخول الادمن من البوابة
   function showStatus(message, error) {
     status.textContent = message;
     status.style.border = error ? "1px solid #d65b5b" : "1px solid #477d61";
@@ -2270,7 +2317,7 @@ document.getElementById('rn-withdraw-submit')
 
 
 <!-- ROARNET_ADMIN_WITHDRAWAL_PANEL_V1 -->
-<section id="rn-admin-withdrawals"
+<section id="rn-admin-withdrawals" hidden
  style="margin:18px 0;padding:18px;border:1px solid #416078;border-radius:14px;background:#102333;color:#e8f3fa">
   <h3>إدارة طلبات سحب المشاركين</h3>
   <p style="font-size:13px;color:#b8ccda">
