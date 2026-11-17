@@ -1745,7 +1745,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ROARNET_UNIFIED_UI_V1
-    if (req.method === 'GET' && url.pathname === '/') {
+    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/admin')) {
       addPageVisit.run(getBaghdadDay(), now());
       const page = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
       res.writeHead(200, {
