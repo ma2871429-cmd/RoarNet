@@ -7,6 +7,9 @@ public final class RelayAgentService extends android.app.Service {
     private volatile String deviceId;
     private volatile Thread checker;
 
+    private volatile Thread relayWorker;
+    private volatile boolean relayEnabled = false;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -46,6 +49,14 @@ public final class RelayAgentService extends android.app.Service {
             return START_NOT_STICKY;
         }
 
+        // Fail closed: never start Relay without local sharing consent.
+        if (!hasLocalSharingConsent()) {
+            relayEnabled = false;
+            ParticipantTcpTunnel.closeAll();
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
         String token = intent.getStringExtra("access_token");
         String device = intent.getStringExtra("device_id");
 
@@ -66,6 +77,16 @@ public final class RelayAgentService extends android.app.Service {
 
         checker = new Thread(() -> monitorConsent(startId), "RoarNet-Consent-Monitor");
         checker.start();
+
+        Thread oldRelay = relayWorker;
+        if (oldRelay != null) oldRelay.interrupt();
+
+        relayWorker = new Thread(
+            this::runRelayAgent,
+            "RoarNet-Device-TCP-Agent"
+        );
+        relayWorker.start();
+
 
         return START_NOT_STICKY;
     }
@@ -191,19 +212,297 @@ public final class RelayAgentService extends android.app.Service {
         }
     }
 
+
+    // ROARNET_DEVICE_TCP_AGENT_V1
+
+    private org.json.JSONObject gatewayPost(
+        String route,
+        org.json.JSONObject payload
+    ) throws Exception {
+        java.net.HttpURLConnection connection = null;
+        try {
+            connection = (java.net.HttpURLConnection)
+                new java.net.URL("http://127.0.0.1:3182" + route)
+                    .openConnection();
+
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(10000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty(
+                "Authorization", "Bearer " + accessToken
+            );
+            connection.setRequestProperty(
+                "Content-Type", "application/json; charset=utf-8"
+            );
+            connection.setRequestProperty("Cache-Control", "no-store");
+
+            byte[] body = payload.toString().getBytes(
+                java.nio.charset.StandardCharsets.UTF_8
+            );
+            connection.setFixedLengthStreamingMode(body.length);
+
+            try (java.io.OutputStream out = connection.getOutputStream()) {
+                out.write(body);
+                out.flush();
+            }
+
+            int status = connection.getResponseCode();
+            java.io.InputStream stream = status >= 200 && status < 300
+                ? connection.getInputStream()
+                : connection.getErrorStream();
+
+            if (stream == null) {
+                throw new java.io.IOException("GATEWAY_HTTP_" + status);
+            }
+
+            byte[] response;
+            try (java.io.InputStream in = stream;
+                 java.io.ByteArrayOutputStream out =
+                     new java.io.ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (out.size() + count > 128 * 1024) {
+                        throw new java.io.IOException(
+                            "GATEWAY_RESPONSE_TOO_LARGE"
+                        );
+                    }
+                    out.write(buffer, 0, count);
+                }
+                response = out.toByteArray();
+            }
+
+            if (status < 200 || status >= 300) {
+                throw new java.io.IOException("GATEWAY_HTTP_" + status);
+            }
+
+            org.json.JSONObject result = new org.json.JSONObject(
+                new String(response, java.nio.charset.StandardCharsets.UTF_8)
+            );
+
+            if (!result.optBoolean("success", false)) {
+                throw new java.io.IOException(
+                    result.optString("error", "GATEWAY_OPERATION_FAILED")
+                );
+            }
+
+            return result;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private org.json.JSONObject agentPayload(String sessionId)
+        throws Exception {
+        return new org.json.JSONObject()
+            .put("deviceId", deviceId)
+            .put("sessionId", sessionId);
+    }
+
+    private void runRelayAgent() {
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                if (!hasLocalSharingConsent()) {
+                    relayEnabled = false;
+                    ParticipantTcpTunnel.closeAll();
+                    return;
+                }
+
+                if (!relayEnabled) {
+                    Thread.sleep(1000);
+                    continue;
+                }
+
+                org.json.JSONObject next = gatewayPost(
+                    "/agent/next",
+                    new org.json.JSONObject().put("deviceId", deviceId)
+                );
+
+                org.json.JSONObject assignment =
+                    next.optJSONObject("assignment");
+
+                if (assignment == null) {
+                    Thread.sleep(3000);
+                    continue;
+                }
+
+                runDeviceSession(assignment);
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception ignored) {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void runDeviceSession(
+        org.json.JSONObject assignment
+    ) throws Exception {
+        String sessionId = assignment.optString("sessionId", "");
+        String host = assignment.optString("destinationHost", "");
+        int port = assignment.optInt("destinationPort", -1);
+
+        if (!sessionId.matches("[A-Za-z0-9_-]{8,100}") ||
+            host.isEmpty() || (port != 80 && port != 443)) {
+            throw new java.io.IOException("DEVICE_ASSIGNMENT_REJECTED");
+        }
+
+        boolean gatewayOpened = false;
+
+        try {
+            org.json.JSONObject opened = gatewayPost(
+                "/agent/session/open",
+                agentPayload(sessionId)
+            );
+            gatewayOpened = true;
+
+            if (!opened.optBoolean("requiresDeviceTcp", false)) {
+                throw new java.io.IOException("DEVICE_TCP_REQUIRED");
+            }
+
+            if (!ParticipantTcpTunnel.open(sessionId, host, port)) {
+                throw new java.io.IOException("DEVICE_TCP_OPEN_FAILED");
+            }
+
+            gatewayPost(
+                "/agent/session/activate",
+                agentPayload(sessionId).put("connected", true)
+            );
+
+            while (relayEnabled &&
+                   !Thread.currentThread().isInterrupted() &&
+                   ParticipantTcpTunnel.isActive(sessionId)) {
+
+                // Buyer -> participant TCP socket
+                org.json.JSONObject incoming = gatewayPost(
+                    "/agent/session/receive",
+                    agentPayload(sessionId)
+                );
+
+                org.json.JSONArray items = incoming.optJSONArray("items");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        org.json.JSONObject item = items.optJSONObject(i);
+                        if (item == null) continue;
+
+                        String encoded = item.optString("data", "");
+                        if (encoded.isEmpty()) continue;
+
+                        byte[] bytes = android.util.Base64.decode(
+                            encoded, android.util.Base64.DEFAULT
+                        );
+                        ParticipantTcpTunnel.write(sessionId, bytes);
+                    }
+                }
+
+                // Participant TCP socket -> buyer
+                java.util.List<String> outgoing =
+                    ParticipantTcpTunnel.receive(sessionId, 16);
+
+                for (String chunk : outgoing) {
+                    gatewayPost(
+                        "/agent/session/send",
+                        agentPayload(sessionId).put("payload", chunk)
+                    );
+                }
+
+                Thread.sleep(120);
+            }
+
+        } finally {
+            ParticipantTcpTunnel.close(sessionId);
+
+            long[] finalTraffic =
+                ParticipantTcpTunnel.takeFinalTrafficBytes(sessionId);
+
+            if (gatewayOpened) {
+                try {
+                    org.json.JSONObject closePayload =
+                        agentPayload(sessionId);
+
+                    if (finalTraffic != null && finalTraffic.length >= 3) {
+                        org.json.JSONObject report =
+                            new org.json.JSONObject();
+
+                        report.put("reportVersion", 1);
+                        report.put("sessionId", sessionId);
+                        report.put(
+                            "deviceId",
+                            closePayload.optString("deviceId", "")
+                        );
+                        report.put("bytesSent", finalTraffic[0]);
+                        report.put("bytesReceived", finalTraffic[1]);
+                        report.put("totalBytes", finalTraffic[2]);
+
+                        byte[] reportBytes = report.toString().getBytes(
+                            java.nio.charset.StandardCharsets.UTF_8
+                        );
+
+                        byte[] digest = java.security.MessageDigest
+                            .getInstance("SHA-256")
+                            .digest(reportBytes);
+
+                        char[] hex = "0123456789abcdef".toCharArray();
+                        StringBuilder reportHash = new StringBuilder(64);
+
+                        for (byte value : digest) {
+                            int v = value & 0xff;
+                            reportHash.append(hex[v >>> 4]);
+                            reportHash.append(hex[v & 0x0f]);
+                        }
+
+                        closePayload.put("agentReport", report);
+                        closePayload.put(
+                            "agentReportHash",
+                            reportHash.toString()
+                        );
+                    }
+
+                    gatewayPost(
+                        "/agent/session/close",
+                        closePayload
+                    );
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private boolean hasLocalSharingConsent() {
+        return getSharedPreferences("roarnet_consent", MODE_PRIVATE)
+            .getBoolean("accepted", false);
+    }
+
     private void monitorConsent(int startId) {
         while (!Thread.currentThread().isInterrupted()) {
+
+            if (!hasLocalSharingConsent()) {
+                relayEnabled = false;
+                ParticipantTcpTunnel.closeAll();
+                stopSelf(startId);
+                return;
+            }
 
             Boolean consent = consentStatus();
 
             if (Boolean.FALSE.equals(consent)) {
-                // Gateway authentication will revoke this device's sessions.
+                relayEnabled = false;
+                ParticipantTcpTunnel.closeAll();
                 sendGatewayHeartbeat();
                 stopSelf(startId);
                 return;
             }
 
             if (consent == null) {
+                relayEnabled = false;
+                ParticipantTcpTunnel.closeAll();
                 // Temporary server/network failure: retry without treating
                 // it as an explicit consent revocation.
                 try {
@@ -215,6 +514,7 @@ public final class RelayAgentService extends android.app.Service {
                 continue;
             }
 
+            relayEnabled = true;
             sendGatewayHeartbeat();
 
             try {
@@ -230,6 +530,10 @@ public final class RelayAgentService extends android.app.Service {
     public void onDestroy() {
         Thread current = checker;
         if (current != null) current.interrupt();
+        relayEnabled = false;
+        Thread relay = relayWorker;
+        if (relay != null) relay.interrupt();
+        ParticipantTcpTunnel.closeAll();
         accessToken = null;
         deviceId = null;
         stopForeground(true);
