@@ -124,9 +124,45 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference TEXT NOT NULL UNIQUE,
     net_cents INTEGER NOT NULL CHECK(net_cents > 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
+    participant_pool_cents INTEGER CHECK(participant_pool_cents IS NULL OR participant_pool_cents >= 0),
     created_at TEXT NOT NULL
   );
 `);
+
+{
+  const columns = db.prepare('PRAGMA table_info(net_revenue)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE net_revenue ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+  if (!columns.includes('participant_pool_cents')) {
+    db.exec('ALTER TABLE net_revenue ADD COLUMN participant_pool_cents INTEGER CHECK(participant_pool_cents IS NULL OR participant_pool_cents >= 0)');
+  }
+}
+
+ // ROARNET_PROVIDER_REVENUE_LEDGER_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS provider_revenue_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT NOT NULL UNIQUE,
+    provider TEXT NOT NULL DEFAULT 'manual',
+    month_key TEXT NOT NULL,
+    provider_bytes INTEGER NOT NULL CHECK(provider_bytes > 0),
+    net_cents INTEGER NOT NULL CHECK(net_cents > 0),
+    pool_cents INTEGER NOT NULL CHECK(pool_cents >= 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_provider_revenue_month
+    ON provider_revenue_batches(month_key);
+`);
+
+{
+  const columns = db.prepare('PRAGMA table_info(provider_revenue_batches)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE provider_revenue_batches ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+}
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS customers (
@@ -261,6 +297,7 @@ db.exec(`
     contribution_bytes INTEGER NOT NULL CHECK(contribution_bytes > 0),
     revenue_cents INTEGER NOT NULL CHECK(revenue_cents >= 0),
     pool_cents INTEGER NOT NULL CHECK(pool_cents >= 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
     amount_cents INTEGER NOT NULL CHECK(amount_cents >= 0),
     created_at TEXT NOT NULL
   );
@@ -271,6 +308,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_earning_entries_participant
     ON participant_earning_entries(participant_id, month_key);
 `);
+
+{
+  const columns = db.prepare('PRAGMA table_info(participant_earning_entries)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE participant_earning_entries ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+}
 
 
 // ROARNET_SALES_V1
@@ -604,8 +648,8 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
     const insertEarningEntry = db.prepare(`
       INSERT INTO participant_earning_entries(
         allocation_id,event_id,order_id,participant_id,month_key,
-        contribution_bytes,revenue_cents,pool_cents,amount_cents,created_at
-      ) VALUES(?,?,?,?,?,?,?,?,?,?)
+        contribution_bytes,revenue_cents,pool_cents,owner_share_cents,amount_cents,created_at
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
     `);
 
     for (const order of orders) {
@@ -638,14 +682,15 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
       const cumulativeRevenue = (netCents * cumulativeBytes) / packageBytes;
       const revenueDelta = cumulativeRevenue - previousRevenue;
 
-      const previousPool = (netCents * 15n * previousBytes) / (100n * packageBytes);
-      const cumulativePool = (netCents * 15n * cumulativeBytes) / (100n * packageBytes);
+      const previousPool = (netCents * 50n * previousBytes) / (100n * packageBytes);
+      const cumulativePool = (netCents * 50n * cumulativeBytes) / (100n * packageBytes);
       const poolDelta = cumulativePool - previousPool;
 
+      const ownerDelta = revenueDelta - poolDelta;
       const participantId = node.participant_id ?? null;
       const amountCents = participantId ? poolDelta : 0n;
 
-      for (const value of [revenueDelta, poolDelta, amountCents]) {
+      for (const value of [revenueDelta, poolDelta, ownerDelta, amountCents]) {
         if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
           throw new Error('ACCOUNTING_AMOUNT_OUT_OF_SAFE_RANGE');
         }
@@ -664,6 +709,7 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
         allocated,
         Number(revenueDelta),
         Number(poolDelta),
+        Number(ownerDelta),
         Number(amountCents),
         now()
       );
@@ -3432,6 +3478,8 @@ const server = http.createServer(async (req, res) => {
       }
       const netCents = Math.round(netUsd * 100);
       if (!Number.isSafeInteger(netCents) || netCents < 1) return json(res, 400, { error: 'Invalid net amount precision' });
+      const participantCents = Math.floor(netCents * 50 / 100);
+      const ownerCents = netCents - participantCents;
       const order = db.prepare('SELECT * FROM orders WHERE id=?').get(confirmOrderMatch[1]);
       if (!order) return json(res, 404, { error: 'Order not found' });
       if (order.status !== 'pending') return json(res, 409, { error: 'Order is not pending' });
@@ -3441,8 +3489,11 @@ const server = http.createServer(async (req, res) => {
         const changed = db.prepare("UPDATE orders SET status='paid',payment_provider=?,payment_reference=?,net_cents=?,paid_at=? WHERE id=? AND status='pending'")
           .run(provider, paymentReference, netCents, now(), order.id);
         if (Number(changed.changes) !== 1) throw new Error('ORDER_STATE_CHANGED');
-        db.prepare('INSERT INTO net_revenue(reference,net_cents,created_at,order_id) VALUES(?,?,?,?)')
-          .run('roarnet-order-' + order.id, netCents, now(), order.id);
+        db.prepare(`INSERT INTO net_revenue(
+          reference,net_cents,created_at,order_id,owner_share_cents,participant_pool_cents
+        ) VALUES(?,?,?,?,?,?)`).run(
+          'roarnet-order-' + order.id, netCents, now(), order.id, ownerCents, participantCents
+        );
         db.exec('COMMIT');
       } catch (e) {
         try { db.exec('ROLLBACK'); } catch {}
@@ -3450,16 +3501,14 @@ const server = http.createServer(async (req, res) => {
         if (e.message === 'ORDER_STATE_CHANGED') return json(res, 409, { error: 'Order state changed; reload orders' });
         throw e;
       }
-      const ownerCents = Math.floor(netCents * 80 / 100);
-      const participantCents = Math.floor(netCents * 15 / 100);
-      const reserveCents = netCents - ownerCents - participantCents;
+      const reserveCents = 0;
       return json(res, 200, {
         ok: true, orderId: order.id, status: 'paid',
         grossUsd: Number((Number(order.price_cents) / 100).toFixed(2)),
         verifiedNetUsd: Number((netCents / 100).toFixed(2)),
-        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
-        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
-        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
+        ownerShare50Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool50Usd: Number((participantCents / 100).toFixed(2)),
+        operatingReserve0Usd: Number((reserveCents / 100).toFixed(2)),
         note: 'Manual confirmation only: use after independently verifying the funds arrived. This endpoint does not contact a payment provider or send payouts.'
       });
     }
@@ -3651,6 +3700,121 @@ const server = http.createServer(async (req, res) => {
 
     // END ROARNET_ADMIN_WITHDRAWAL_MANAGEMENT_V1
 
+    // ROARNET_PROVIDER_REVENUE_BATCH_API_V1
+    if (url.pathname === '/api/admin/provider-revenue-batches' &&
+        req.method === 'GET') {
+      const rows = db.prepare(`
+        SELECT id, reference, provider, month_key,
+               provider_bytes, net_cents, pool_cents, owner_share_cents, created_at
+        FROM provider_revenue_batches
+        ORDER BY id DESC
+        LIMIT 100
+      `).all();
+
+      return json(res, 200, {
+        batches: rows.map(row => ({
+          batchId: Number(row.id),
+          reference: row.reference,
+          provider: row.provider,
+          month: row.month_key,
+          providerBytes: Number(row.provider_bytes),
+          netUsd: Number((row.net_cents / 100).toFixed(2)),
+          participantPoolUsd: Number((row.pool_cents / 100).toFixed(2)),
+          ownerShareUsd: row.owner_share_cents === null ? null : Number((row.owner_share_cents / 100).toFixed(2)),
+          createdAt: row.created_at
+        }))
+      });
+    }
+
+    if (url.pathname === '/api/admin/provider-revenue-batches' &&
+        req.method === 'POST') {
+      const b = await body(req);
+      const reference = String(b.reference || '').trim();
+      const month = String(b.month || '');
+      const providerBytes = Number(b.providerBytes);
+      const amount = Number(b.netUsd);
+
+      if (!/^[A-Za-z0-9_.:-]{8,120}$/.test(reference) ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ||
+          !Number.isSafeInteger(providerBytes) || providerBytes <= 0 ||
+          !Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
+        return json(res, 400, { error: 'Invalid provider revenue batch fields' });
+      }
+
+      const cents = Math.round(amount * 100);
+      if (!Number.isSafeInteger(cents) || cents < 1) {
+        return json(res, 400, { error: 'Invalid amount precision' });
+      }
+
+      const closedMonth = db.prepare(`
+        SELECT 1 FROM settlement_batches
+        WHERE month_key = ? AND status = 'completed'
+      `).get(month);
+
+      if (closedMonth) {
+        return json(res, 409, {
+          error: 'This month has already been settled',
+          month
+        });
+      }
+
+      const poolCents = Math.floor(cents * 50 / 100);
+      const timestamp = now();
+
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        const result = db.prepare(`
+          INSERT INTO provider_revenue_batches
+            (reference, provider, month_key, provider_bytes,
+             net_cents, pool_cents, owner_share_cents, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          reference,
+          String(b.provider || 'manual').slice(0, 80),
+          month,
+          providerBytes,
+          cents,
+          poolCents,
+          cents - poolCents,
+          timestamp
+        );
+
+        db.prepare(`
+          INSERT INTO net_revenue(
+            reference, net_cents, created_at,
+            owner_share_cents, participant_pool_cents
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          'provider:' + reference, cents, timestamp, cents - poolCents, poolCents
+        );
+
+        db.exec('COMMIT');
+
+        const ownerCents = cents - poolCents;
+        const reserveCents = 0;
+
+        return json(res, 201, {
+          ok: true,
+          batchId: Number(result.lastInsertRowid),
+          reference,
+          month,
+          recordedNetUsd: cents / 100,
+          ownerShare50Usd: ownerCents / 100,
+          participantPool50Usd: poolCents / 100,
+          operatingReserve0Usd: reserveCents / 100,
+          participantPoolStatus: 'unallocated'
+        });
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (_) {}
+        if (String(e.message).includes('UNIQUE')) {
+          return json(res, 409, { error: 'Duplicate provider revenue reference' });
+        }
+        throw e;
+      }
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/admin/settlements') {
       const rows = db.prepare(`
         SELECT month_key, revenue_cents, owner_share_cents,
@@ -3671,10 +3835,21 @@ const server = http.createServer(async (req, res) => {
         const entries = db.prepare(`
           SELECT COALESCE(SUM(revenue_cents),0) revenue,
                  COALESCE(SUM(pool_cents),0) pool,
+                 COALESCE(SUM(owner_share_cents),0) owner,
+                 COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END),0) owner_unknown,
                  COALESCE(SUM(amount_cents),0) allocated,
                  COUNT(*) entry_count
           FROM participant_earning_entries
           WHERE substr(month_key,1,7)=?
+        `).get(monthKey);
+
+        const providerTotals = db.prepare(`
+          SELECT COALESCE(SUM(net_cents),0) revenue,
+                 COALESCE(SUM(pool_cents),0) pool,
+                 COALESCE(SUM(owner_share_cents),0) owner,
+                 COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END),0) owner_unknown
+          FROM provider_revenue_batches
+          WHERE month_key=?
         `).get(monthKey);
 
         const earnings = db.prepare(`
@@ -3709,20 +3884,23 @@ const server = http.createServer(async (req, res) => {
         const allocated = bi(batch.allocated_cents);
         const unallocated = bi(batch.unallocated_cents);
 
-        const expectedOwner = revenue * 80n / 100n;
-        const expectedReserve = revenue - expectedOwner - pool;
+        const ownerUnknown = Number(entries.owner_unknown || 0) +
+          Number(providerTotals.owner_unknown || 0);
+        const expectedOwner = bi(entries.owner) + bi(providerTotals.owner);
 
         compare('إيراد القيود لا يطابق التسوية', entries.revenue, revenue);
         compare('حصة المشاركين لا تطابق القيود', entries.pool, pool);
         compare('الموزع في القيود لا يطابق التسوية', entries.allocated, allocated);
         compare('إجمالي أرباح المشاركين لا يطابق الموزع', earnings.allocated, allocated);
-        compare('حصة المالك لا تساوي 80%', owner, expectedOwner);
-        compare('احتياطي التشغيل لا يطابق المتبقي', reserve, expectedReserve);
-        compare('مجموع الحصص لا يساوي الإيراد', revenue, owner + pool + reserve);
+        if (ownerUnknown === 0) {
+          compare('حصة المالك لا تطابق لقطات القيود المحفوظة', owner, expectedOwner);
+        }
+        if (batch.owner_share_cents !== null &&
+            batch.operating_reserve_cents !== null) {
+          compare('مجموع الحصص لا يساوي الإيراد', revenue, owner + pool + reserve);
+        }
         compare('الموزع وغير الموزع لا يساويان حصة المشاركين',
                 pool, allocated + unallocated);
-
-        if (expectedReserve < 0n) issues.push('احتياطي التشغيل سالب');
 
         const sourceMap = new Map(sourceRows.map(r => [String(r.participant_id), r]));
         const earningMap = new Map(earningRows.map(r => [String(r.participant_id), r]));
@@ -3762,6 +3940,8 @@ const server = http.createServer(async (req, res) => {
           issues,
           checkedParticipants: ids.size,
           checkedEntries: Number(entries.entry_count || 0),
+          ownerSnapshotStatus: ownerUnknown === 0 ? 'verified' : 'historical-snapshot-unavailable',
+          ownerSnapshotUnknownRows: ownerUnknown,
           orderMismatches
         };
       };
@@ -3770,9 +3950,9 @@ const server = http.createServer(async (req, res) => {
         settlements: rows.map(row => ({
           monthKey: String(row.month_key),
           revenueUsd: Number((Number(row.revenue_cents)/100).toFixed(2)),
-          ownerShareUsd: Number((Number(row.owner_share_cents)/100).toFixed(2)),
+          ownerShareUsd: row.owner_share_cents === null ? null : Number((Number(row.owner_share_cents)/100).toFixed(2)),
           participantPoolUsd: Number((Number(row.participant_pool_cents)/100).toFixed(2)),
-          operatingReserveUsd: Number((Number(row.operating_reserve_cents)/100).toFixed(2)),
+          operatingReserveUsd: row.operating_reserve_cents === null ? null : Number((Number(row.operating_reserve_cents)/100).toFixed(2)),
           allocatedUsd: Number((Number(row.allocated_cents)/100).toFixed(2)),
           unallocatedUsd: Number((Number(row.unallocated_cents)/100).toFixed(2)),
           completedAt: row.completed_at,
@@ -3788,17 +3968,26 @@ const server = http.createServer(async (req, res) => {
       const nodes = db.prepare(
         "SELECT COUNT(*) AS count FROM nodes WHERE status='active'"
       ).get().count;
-      const cents = db.prepare(
-        'SELECT COALESCE(SUM(net_cents),0) AS cents FROM net_revenue'
-      ).get().cents;
-
-      const ownerCents = Math.floor(cents * 80 / 100);
-      const participantCents = Math.floor(cents * 15 / 100);
-      const reserveCents = cents - ownerCents - participantCents;
+      const revenueTotals = db.prepare(`
+        SELECT
+          COALESCE(SUM(net_cents),0) AS cents,
+          COALESCE(SUM(owner_share_cents),0) AS owner_cents,
+          COALESCE(SUM(participant_pool_cents),0) AS participant_cents,
+          COALESCE(SUM(CASE
+            WHEN owner_share_cents IS NULL OR participant_pool_cents IS NULL
+            THEN net_cents ELSE 0 END),0) AS unclassified_cents
+        FROM net_revenue
+      `).get();
+      const cents = Number(revenueTotals.cents);
+      const ownerCents = Number(revenueTotals.owner_cents);
+      const participantCents = Number(revenueTotals.participant_cents);
+      const unclassifiedCents = Number(revenueTotals.unclassified_cents);
+      const reserveCents = 0;
 
       const settlement = db.prepare(`
         SELECT
           COUNT(*) AS months,
+          COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS unknown_owner_months,
           COALESCE(SUM(revenue_cents), 0) AS revenue_cents,
           COALESCE(SUM(owner_share_cents), 0) AS owner_share_cents,
           COALESCE(SUM(participant_pool_cents), 0) AS participant_pool_cents,
@@ -3814,10 +4003,12 @@ const server = http.createServer(async (req, res) => {
         meteredBytes: Number(usage.bytes),
         usageEvents: Number(usage.events),
         recordedNetRevenueUsd: Number((cents / 100).toFixed(2)),
-        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
-        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
-        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
+        ownerShare50Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool50Usd: Number((participantCents / 100).toFixed(2)),
+        unclassifiedNetRevenueUsd: Number((unclassifiedCents / 100).toFixed(2)),
+        operatingReserve0Usd: Number((reserveCents / 100).toFixed(2)),
         completedSettlementMonths: Number(settlement.months),
+        settledSplitUnknownMonths: Number(settlement.unknown_owner_months),
         settledRevenueUsd: Number((settlement.revenue_cents / 100).toFixed(2)),
         settledOwnerShareUsd: Number((settlement.owner_share_cents / 100).toFixed(2)),
         settledParticipantPoolUsd: Number((settlement.participant_pool_cents / 100).toFixed(2)),
@@ -3846,8 +4037,8 @@ const server = http.createServer(async (req, res) => {
 
       try {
         db.prepare(
-          'INSERT INTO net_revenue(reference,net_cents,created_at) VALUES(?,?,?)'
-        ).run(reference, cents, now());
+          'INSERT INTO net_revenue(reference,net_cents,created_at,owner_share_cents,participant_pool_cents) VALUES(?,?,?,?,?)'
+        ).run(reference, cents, now(), cents - Math.floor(cents * 50 / 100), Math.floor(cents * 50 / 100));
       } catch (e) {
         if (String(e.message).includes('UNIQUE')) {
           return json(res, 409, { error: 'Duplicate revenue reference' });
@@ -3855,16 +4046,16 @@ const server = http.createServer(async (req, res) => {
         throw e;
       }
 
-      const ownerCents = Math.floor(cents * 80 / 100);
-      const participantCents = Math.floor(cents * 15 / 100);
-      const reserveCents = cents - ownerCents - participantCents;
+      const participantCents = Math.floor(cents * 50 / 100);
+      const ownerCents = cents - participantCents;
+      const reserveCents = 0;
 
       return json(res, 201, {
         ok: true,
         recordedNetUsd: cents / 100,
-        ownerShare80Usd: ownerCents / 100,
-        participantPool15Usd: participantCents / 100,
-        operatingReserve5Usd: reserveCents / 100,
+        ownerShare50Usd: ownerCents / 100,
+        participantPool50Usd: participantCents / 100,
+        operatingReserve0Usd: reserveCents / 100,
         note: 'Shares are calculated from verified net revenue. This does not move money or pay users.'
       });
     }
@@ -3932,42 +4123,30 @@ db.exec(`
   if (!columns.includes('owner_share_cents')) {
     db.exec(`
       ALTER TABLE settlement_batches
-      ADD COLUMN owner_share_cents INTEGER NOT NULL DEFAULT 0
-      CHECK(owner_share_cents >= 0)
+      ADD COLUMN owner_share_cents INTEGER
+      CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)
     `);
   }
 
   if (!columns.includes('operating_reserve_cents')) {
     db.exec(`
       ALTER TABLE settlement_batches
-      ADD COLUMN operating_reserve_cents INTEGER NOT NULL DEFAULT 0
-      CHECK(operating_reserve_cents >= 0)
+      ADD COLUMN operating_reserve_cents INTEGER
+      CHECK(operating_reserve_cents IS NULL OR operating_reserve_cents >= 0)
     `);
   }
 
   const invalid = db.prepare(`
     SELECT COUNT(*) AS count
     FROM settlement_batches
-    WHERE participant_pool_cents >
-      revenue_cents - CAST(revenue_cents * 80 / 100 AS INTEGER)
+    WHERE participant_pool_cents > revenue_cents
   `).get();
 
   if (Number(invalid.count) !== 0) {
     throw new Error('SETTLEMENT_OWNER_RESERVE_MIGRATION_INVALID');
   }
 
-  db.exec(`
-    UPDATE settlement_batches
-    SET owner_share_cents =
-          CAST(revenue_cents * 80 / 100 AS INTEGER),
-        operating_reserve_cents =
-          revenue_cents
-          - CAST(revenue_cents * 80 / 100 AS INTEGER)
-          - participant_pool_cents
-    WHERE revenue_cents > 0
-      AND owner_share_cents = 0
-      AND operating_reserve_cents = 0;
-  `);
+  // Historical settlement rows are immutable. Never infer or backfill their split.
 }
 // END ROARNET_SETTLEMENT_OWNER_RESERVE_V1
 
@@ -4035,13 +4214,36 @@ function settleRoarNetMonth(monthKey) {
     const totals = db.prepare(`
       SELECT
         COALESCE(SUM(revenue_cents), 0) AS revenue,
-        COALESCE(SUM(pool_cents), 0) AS pool
+        COALESCE(SUM(pool_cents), 0) AS pool,
+        COALESCE(SUM(owner_share_cents), 0) AS owner,
+        COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS owner_unknown
       FROM participant_earning_entries
       WHERE substr(month_key, 1, 7) = ?
     `).get(monthKey);
 
-    const revenueCents = Number(totals.revenue);
-    const poolCents = Number(totals.pool);
+    const providerTotals = db.prepare(`
+      SELECT
+        COALESCE(SUM(net_cents), 0) AS revenue,
+        COALESCE(SUM(pool_cents), 0) AS pool,
+        COALESCE(SUM(owner_share_cents), 0) AS owner,
+        COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS owner_unknown
+      FROM provider_revenue_batches
+      WHERE month_key = ?
+    `).get(monthKey);
+
+    if (Number(totals.owner_unknown) + Number(providerTotals.owner_unknown) > 0) {
+      throw new Error('SETTLEMENT_BLOCKED_LEGACY_OWNER_SPLIT_UNKNOWN:' + monthKey);
+    }
+
+    const revenueBigTotal =
+      BigInt(totals.revenue) + BigInt(providerTotals.revenue);
+    const poolBigTotal =
+      BigInt(totals.pool) + BigInt(providerTotals.pool);
+    const ownerBigTotal =
+      BigInt(totals.owner) + BigInt(providerTotals.owner);
+
+    const revenueCents = Number(revenueBigTotal);
+    const poolCents = Number(poolBigTotal);
 
     if (
       !Number.isSafeInteger(revenueCents) ||
@@ -4054,15 +4256,15 @@ function settleRoarNetMonth(monthKey) {
 
     const revenueBig = BigInt(revenueCents);
     const poolBig = BigInt(poolCents);
-    const ownerBig = revenueBig * 80n / 100n;
+    const ownerBig = ownerBigTotal;
     const reserveBig = revenueBig - ownerBig - poolBig;
 
-    if (reserveBig < 0n) {
-      throw new Error('Settlement owner/reserve split is invalid');
+    if (reserveBig !== 0n) {
+      throw new Error('Settlement saved owner/participant snapshots do not equal revenue');
     }
 
     const ownerShareCents = Number(ownerBig);
-    const reserveCents = Number(reserveBig);
+    const reserveCents = 0;
 
     if (
       !Number.isSafeInteger(ownerShareCents) ||

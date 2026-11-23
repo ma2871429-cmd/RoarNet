@@ -1,5 +1,21 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import {
+  initializeThreatIntelligence,
+  isSpamhausBlocked
+} from './threat-intelligence.mjs';
+import {
+  initializePhishTank,
+  isPhishTankBlocked
+} from './phishtank.mjs';
+import {
+  initializeC2Intelligence,
+  isKnownC2Address
+} from './c2-intelligence.mjs';
+import {
+  initializeMalwareIntelligence,
+  isMalwareHostBlocked
+} from './malware-intelligence.mjs';
 
 const BLOCKED_IPV4 = [
   ['0.0.0.0', 8],
@@ -89,11 +105,34 @@ export async function resolvePublicDestination(hostname) {
     throw new Error('INVALID_DESTINATION_HOST');
   }
 
+  await initializeThreatIntelligence();
+  await initializeC2Intelligence();
+
   if (hostFamily) {
     if (!publicAddress(host)) {
       throw new Error('BLOCKED_DESTINATION_ADDRESS');
     }
+
+    if (isSpamhausBlocked(host)) {
+      throw new Error('SPAMHAUS_BLOCKED_DESTINATION_ADDRESS');
+    }
+
+    if (isKnownC2Address(host)) {
+      throw new Error('C2_BLOCKED_DESTINATION_ADDRESS');
+    }
+
     return [{ address: host, family: net.isIP(host) }];
+  }
+
+  await initializePhishTank();
+  await initializeMalwareIntelligence();
+
+  if (isPhishTankBlocked(host)) {
+    throw new Error('PHISHTANK_BLOCKED_DESTINATION_HOST');
+  }
+
+  if (isMalwareHostBlocked(host)) {
+    throw new Error('THREATCLUSTER_BLOCKED_MALWARE_HOST');
   }
 
   let records;
@@ -106,6 +145,14 @@ export async function resolvePublicDestination(hostname) {
   if (!records.length ||
       records.some(record => !publicAddress(record.address))) {
     throw new Error('BLOCKED_OR_MIXED_DNS_DESTINATION');
+  }
+
+  if (records.some(record => isSpamhausBlocked(record.address))) {
+    throw new Error('SPAMHAUS_BLOCKED_DNS_DESTINATION');
+  }
+
+  if (records.some(record => isKnownC2Address(record.address))) {
+    throw new Error('C2_BLOCKED_DNS_DESTINATION');
   }
 
   return records;
