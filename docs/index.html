@@ -1,75 +1,183 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RoarNet — Iraqi Open-Source Mobile Network Project</title>
-<meta name="description" content="RoarNet is an Iraqi open-source project for Android mobile network analytics and bandwidth-sharing research, built around Node.js and Termux.">
-<meta name="keywords" content="RoarNet, Iraq, bandwidth sharing, Android, Node.js, Termux, mobile network analytics, open source, proxy network">
+<meta name="theme-color" content="#080e19">
+<meta name="description" content="RoarNet مشروع تقني عراقي لتطوير تطبيقات أندرويد وإدارة الاتصال وتقنيات الشبكات.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://ma2871429-cmd.github.io/RoarNet/">
-<meta property="og:title" content="RoarNet — Iraqi Open-Source Network Project">
-<meta property="og:description" content="An Iraqi open-source Android and Node.js mobile network project.">
+<meta property="og:title" content="RoarNet | شبكة بإدارتك">
+<meta property="og:description" content="مشروع تقني عراقي لتطوير تطبيقات أندرويد وتقنيات الشبكات.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://ma2871429-cmd.github.io/RoarNet/">
-<meta name="twitter:card" content="summary">
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#10151d;color:#edf2f7;font:16px/1.7 system-ui,sans-serif}
-main{max-width:900px;margin:auto;padding:48px 22px}
-header{text-align:center;padding:42px 0}
-h1{font-size:clamp(2.5rem,8vw,4.5rem);margin:0;color:#f5a623}
-h2{color:#f5a623;margin-top:32px}
-p{color:#cbd5e1}
-.tag{display:inline-block;background:#222d3b;border:1px solid #3b4a5e;border-radius:20px;padding:5px 12px;margin:4px;font-size:14px}
-a{color:#f5b544}
-.panel{background:#192330;border:1px solid #344256;border-radius:14px;padding:20px;margin:18px 0}
-.notice{border-left:4px solid #e5a32b;padding:12px 16px;background:#202936}
-footer{margin-top:48px;border-top:1px solid #344256;padding-top:20px;color:#94a3b8}
-</style>
-<meta name="google-site-verification" content="YAEJzrTsG6V44cvlWfcCP2SWaf92yXvoYSVfnti_aJs" />
+<link rel="stylesheet" href="assets/site.css">
+<title>RoarNet | الموقع الرسمي</title>
 </head>
-<body>
-<main>
+<body data-title-ar="RoarNet | الموقع الرسمي" data-title-en="RoarNet | Official Website">
 <header>
-<h1>🦁 RoarNet</h1>
-<p>Iraqi Open-Source Mobile Network Project</p>
-<span class="tag">Android</span><span class="tag">Node.js</span>
-<span class="tag">Termux</span><span class="tag">Open Source</span>
+  <div class="container nav">
+    <a class="brand" href="./" aria-label="RoarNet">
+      <span class="brand-mark">🦁</span><span>Roar<span>Net</span></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#about" data-ar="عن المشروع" data-en="About">عن المشروع</a>
+      <a href="#features" data-ar="المميزات" data-en="Features">المميزات</a>
+      <a href="#security" data-ar="الأمان" data-en="Security">الأمان</a>
+      <a href="partner.html" data-ar="الشراكات" data-en="Partnerships">الشراكات</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="lang-btn" id="langToggle" type="button">English</button>
+      <button class="menu-btn" id="menuToggle" type="button" aria-label="Menu">☰</button>
+    </div>
+  </div>
 </header>
 
-<section class="panel">
-<h2>About RoarNet</h2>
-<p>RoarNet is an Iraqi open-source project focused on mobile network analytics, Android-based network nodes, and bandwidth-sharing technology. It uses Node.js and mobile development tools to explore network connectivity, endpoint testing, and future proxy-network integrations.</p>
+<main>
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span><span data-ar="مشروع تقني عراقي" data-en="An Iraqi technology project">مشروع تقني عراقي</span></span>
+      <h1><span data-ar="مستقبل الشبكات يبدأ من" data-en="The network future starts with">مستقبل الشبكات يبدأ من</span> <em>RoarNet</em></h1>
+      <p class="lead" data-ar="نعمل على تطوير منصة تقنية تجمع تطبيقات أندرويد وإدارة الاتصال والبنية البرمجية للشبكات، مع التركيز على الشفافية والتحكم والأمان." data-en="We are developing a technology platform combining Android applications, connectivity management and network infrastructure, with a focus on transparency, control and security.">نعمل على تطوير منصة تقنية تجمع تطبيقات أندرويد وإدارة الاتصال والبنية البرمجية للشبكات، مع التركيز على الشفافية والتحكم والأمان.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#about" data-ar="اكتشف RoarNet" data-en="Discover RoarNet">اكتشف RoarNet</a>
+        <a class="btn btn-secondary" href="partner.html" data-ar="معلومات الشراكات" data-en="Partnership information">معلومات الشراكات</a>
+      </div>
+      <div class="status">
+        <strong data-ar="حالة التطوير:" data-en="Development status:">حالة التطوير:</strong>
+        <span data-ar="المنصة قيد التطوير والاختبار. مشاركة الإنترنت الفعلية وتحقيق أرباح المشاركين غير متاحين حالياً إلى حين استكمال التكاملات وموافقات المزودين." data-en="The platform is under development and testing. Live bandwidth sharing and participant earnings are not currently available pending provider approvals and integration.">المنصة قيد التطوير والاختبار. مشاركة الإنترنت الفعلية وتحقيق أرباح المشاركين غير متاحين حالياً إلى حين استكمال التكاملات وموافقات المزودين.</span>
+      </div>
+    </div>
+    <div class="hero-visual" aria-label="RoarNet technology illustration">
+      <span class="float-label float-one">Android</span>
+      <span class="float-label float-two">Network Core</span>
+      <span class="float-label float-three">Secure Systems</span>
+      <div class="orbit"><div class="orbit-core">🦁</div></div>
+    </div>
+  </div>
 </section>
 
-<section>
-<h2>Project Status</h2>
-<div class="notice">
-<strong>Beta notice:</strong> The current public beta is intended for development and network endpoint testing. Earning modules are inactive and under development. No participant earnings are currently promised.
-</div>
+<section class="section" id="about">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker" data-ar="عن المشروع" data-en="ABOUT ROARNET">عن المشروع</span>
+      <h2 data-ar="منصة تقنية تُبنى على مراحل" data-en="A technology platform built in stages">منصة تقنية تُبنى على مراحل</h2>
+      <p data-ar="RoarNet مشروع تقني عراقي يهدف إلى تطوير تجربة متكاملة لإدارة الأجهزة والاتصال وخدمات الشبكات. يجري تطوير التطبيق والبنية الخلفية بصورة متدرجة، مع اختبار الوظائف قبل إطلاقها." data-en="RoarNet is an Iraqi technology project focused on developing an integrated experience for device management, connectivity and network services. The application and backend are being developed incrementally, with features tested before release.">RoarNet مشروع تقني عراقي يهدف إلى تطوير تجربة متكاملة لإدارة الأجهزة والاتصال وخدمات الشبكات. يجري تطوير التطبيق والبنية الخلفية بصورة متدرجة، مع اختبار الوظائف قبل إطلاقها.</p>
+    </div>
+    <div class="grid-3">
+      <article class="card">
+        <div class="card-icon">▣</div>
+        <h3 data-ar="تطبيق أندرويد" data-en="Android application">تطبيق أندرويد</h3>
+        <p data-ar="تجربة مخصصة لإدارة حساب المشارك والجهاز وحالة الخدمات من الهاتف." data-en="A mobile experience for managing participant accounts, devices and service status.">تجربة مخصصة لإدارة حساب المشارك والجهاز وحالة الخدمات من الهاتف.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">⌘</div>
+        <h3 data-ar="بنية شبكية" data-en="Network infrastructure">بنية شبكية</h3>
+        <p data-ar="خدمات خلفية وأدوات تنسيق ومراقبة مصممة لدعم وظائف المنصة." data-en="Backend services and coordination tools designed to support platform functions.">خدمات خلفية وأدوات تنسيق ومراقبة مصممة لدعم وظائف المنصة.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">◇</div>
+        <h3 data-ar="تكاملات مستقبلية" data-en="Future integrations">تكاملات مستقبلية</h3>
+        <p data-ar="معمارية قابلة للتوسع لدراسة وربط مزودي خدمات الشبكات وفق الموافقات والمتطلبات." data-en="An extensible architecture for evaluating and integrating network providers, subject to approvals and requirements.">معمارية قابلة للتوسع لدراسة وربط مزودي خدمات الشبكات وفق الموافقات والمتطلبات.</p>
+      </article>
+    </div>
+  </div>
 </section>
 
-<section>
-<h2>Technology</h2>
-<p>RoarNet brings together Android, Node.js, Termux, mobile network testing, and open-source development.</p>
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker" data-ar="ماذا نطوّر؟" data-en="WHAT WE BUILD">ماذا نطوّر؟</span>
+      <h2 data-ar="تقنيات مترابطة ضمن منصة واحدة" data-en="Connected technologies in one platform">تقنيات مترابطة ضمن منصة واحدة</h2>
+    </div>
+    <div class="grid-3">
+      <article class="card">
+        <div class="card-icon">◉</div>
+        <h3 data-ar="إدارة المشاركين" data-en="Participant management">إدارة المشاركين</h3>
+        <p data-ar="إدارة الحسابات والأجهزة وحالات الموافقة والاتصال وفق الوظائف المتاحة." data-en="Managing accounts, devices, consent states and connectivity through available features.">إدارة الحسابات والأجهزة وحالات الموافقة والاتصال وفق الوظائف المتاحة.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">⌁</div>
+        <h3 data-ar="قياس الاستخدام" data-en="Usage monitoring">قياس الاستخدام</h3>
+        <p data-ar="تطوير آليات لتسجيل الاستهلاك والجلسات ومتابعة مؤشرات تشغيل الشبكة." data-en="Developing mechanisms to record usage and sessions and monitor network operation metrics.">تطوير آليات لتسجيل الاستهلاك والجلسات ومتابعة مؤشرات تشغيل الشبكة.</p>
+      </article>
+      <article class="card">
+        <div class="card-icon">⛨</div>
+        <h3 data-ar="الحماية الشبكية" data-en="Network protection">الحماية الشبكية</h3>
+        <p data-ar="العمل على رصد الأنشطة الضارة وتقليل إساءة استخدام الشبكة ضمن نطاق النظام." data-en="Working to detect harmful activity and reduce network abuse within the system's scope.">العمل على رصد الأنشطة الضارة وتقليل إساءة استخدام الشبكة ضمن نطاق النظام.</p>
+      </article>
+    </div>
+  </div>
 </section>
 
-<section class="panel">
-<h2>عن مشروع روارنت</h2>
-<p lang="ar" dir="rtl">روارنت مشروع عراقي مفتوح المصدر يركز على تحليل شبكات الهاتف المحمول، وعُقد الشبكة على أندرويد، وتقنيات مشاركة عرض النطاق الترددي. يعتمد على Node.js وأدوات تطوير الهواتف لاختبار الاتصال ونقاط الشبكة، مع تكاملات مستقبلية محتملة لشبكات البروكسي.</p>
-<p lang="ar" dir="rtl">الإصدار العام الحالي تجريبي ومخصص للتطوير واختبار نقاط الاتصال. وحدات الأرباح غير مفعّلة وقيد التطوير حالياً.</p>
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="kicker" data-ar="آلية العمل" data-en="HOW IT WORKS">آلية العمل</span>
+      <h2 data-ar="تطوير تدريجي، ووضوح في كل مرحلة" data-en="Incremental development, clarity at every stage">تطوير تدريجي، ووضوح في كل مرحلة</h2>
+    </div>
+    <div class="steps">
+      <article class="step">
+        <span class="step-number">01 / ACCOUNT</span>
+        <h3 data-ar="الحساب والإعداد" data-en="Account and setup">الحساب والإعداد</h3>
+        <p data-ar="إعداد حساب المستخدم وربط الجهاز وإظهار المعلومات ذات الصلة." data-en="Set up a user account, connect a device and display relevant information.">إعداد حساب المستخدم وربط الجهاز وإظهار المعلومات ذات الصلة.</p>
+      </article>
+      <article class="step">
+        <span class="step-number">02 / CONSENT</span>
+        <h3 data-ar="الموافقة والتحكم" data-en="Consent and control">الموافقة والتحكم</h3>
+        <p data-ar="توضيح طبيعة الوظائف والحصول على الموافقة المطلوبة قبل تفعيل أي مشاركة." data-en="Explain each feature and obtain the required consent before enabling any sharing.">توضيح طبيعة الوظائف والحصول على الموافقة المطلوبة قبل تفعيل أي مشاركة.</p>
+      </article>
+      <article class="step">
+        <span class="step-number">03 / INTEGRATION</span>
+        <h3 data-ar="التكامل والتشغيل" data-en="Integration and operation">التكامل والتشغيل</h3>
+        <p data-ar="اختبار الخدمات وربط المزودين بعد استكمال الموافقات والاختبارات الفنية." data-en="Test services and connect providers after approvals and technical validation.">اختبار الخدمات وربط المزودين بعد استكمال الموافقات والاختبارات الفنية.</p>
+      </article>
+    </div>
+  </div>
 </section>
 
-<section>
-<h2>Source Code</h2>
-<p><a href="https://github.com/ma2871429-cmd/RoarNet">View RoarNet on GitHub</a></p>
-<p><a href="https://github.com/ma2871429-cmd/RoarNet/releases">Releases and downloads</a></p>
+<section class="section" id="security">
+  <div class="container">
+    <div class="security-panel">
+      <div>
+        <span class="kicker" data-ar="الأمان والشفافية" data-en="SECURITY & TRANSPARENCY">الأمان والشفافية</span>
+        <h2 data-ar="الثقة جزء من التصميم" data-en="Trust is part of the design">الثقة جزء من التصميم</h2>
+        <p class="muted" data-ar="نهدف إلى بناء تجربة واضحة للمستخدم، مع الإفصاح عن طبيعة الخدمات والبيانات والتكاملات الخارجية قبل تشغيلها." data-en="We aim to build a clear user experience, disclosing the nature of services, data handling and external integrations before activation.">نهدف إلى بناء تجربة واضحة للمستخدم، مع الإفصاح عن طبيعة الخدمات والبيانات والتكاملات الخارجية قبل تشغيلها.</p>
+      </div>
+      <div class="security-list">
+        <div class="security-item"><span class="check">✓</span><span data-ar="موافقة صريحة قبل مشاركة الاتصال عند تفعيلها." data-en="Explicit consent before connectivity sharing is enabled.">موافقة صريحة قبل مشاركة الاتصال عند تفعيلها.</span></div>
+        <div class="security-item"><span class="check">✓</span><span data-ar="إمكانية إيقاف المشاركة وسحب الموافقة." data-en="The ability to stop sharing and withdraw consent.">إمكانية إيقاف المشاركة وسحب الموافقة.</span></div>
+        <div class="security-item"><span class="check">✓</span><span data-ar="توضيح دور مزودي الخدمات الخارجية." data-en="Clear disclosure of third-party provider roles.">توضيح دور مزودي الخدمات الخارجية.</span></div>
+        <div class="security-item"><span class="check">✓</span><span data-ar="سياسة خصوصية توضح أنواع البيانات وأغراض معالجتها." data-en="A privacy policy explaining data types and processing purposes.">سياسة خصوصية توضح أنواع البيانات وأغراض معالجتها.</span></div>
+      </div>
+    </div>
+  </div>
 </section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta">
+      <span class="kicker" data-ar="للمهتمين بالتعاون" data-en="FOR PARTNERS">للمهتمين بالتعاون</span>
+      <h2 data-ar="هل ترغب بالتعاون مع RoarNet؟" data-en="Interested in working with RoarNet?">هل ترغب بالتعاون مع RoarNet؟</h2>
+      <p data-ar="نرحب بالتواصل التقني ومناقشة متطلبات التكامل والشراكات المحتملة مع مزودي الخدمات." data-en="We welcome technical discussions about integration requirements and potential partnerships with service providers.">نرحب بالتواصل التقني ومناقشة متطلبات التكامل والشراكات المحتملة مع مزودي الخدمات.</p>
+      <a class="btn btn-primary" href="partner.html" data-ar="صفحة الشراكات" data-en="Partnership page">صفحة الشراكات</a>
+    </div>
+  </div>
+</section>
+</main>
 
 <footer>
-RoarNet — Iraqi Open-Source Project
+  <div class="container footer-row">
+    <div>© 2026 RoarNet — <span data-ar="مشروع تقني عراقي" data-en="An Iraqi technology project">مشروع تقني عراقي</span></div>
+    <div class="footer-links">
+      <a href="partner.html" data-ar="الشراكات" data-en="Partnerships">الشراكات</a>
+      <a href="privacy.html" data-ar="سياسة الخصوصية" data-en="Privacy policy">سياسة الخصوصية</a>
+      <a href="https://github.com/ma2871429-cmd/RoarNet" target="_blank" rel="noopener">GitHub</a>
+      <a href="mailto:roarnet.app@gmail.com">Contact</a>
+    </div>
+  </div>
 </footer>
-</main>
+<script src="assets/site.js"></script>
 </body>
 </html>

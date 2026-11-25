@@ -124,9 +124,45 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     reference TEXT NOT NULL UNIQUE,
     net_cents INTEGER NOT NULL CHECK(net_cents > 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
+    participant_pool_cents INTEGER CHECK(participant_pool_cents IS NULL OR participant_pool_cents >= 0),
     created_at TEXT NOT NULL
   );
 `);
+
+{
+  const columns = db.prepare('PRAGMA table_info(net_revenue)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE net_revenue ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+  if (!columns.includes('participant_pool_cents')) {
+    db.exec('ALTER TABLE net_revenue ADD COLUMN participant_pool_cents INTEGER CHECK(participant_pool_cents IS NULL OR participant_pool_cents >= 0)');
+  }
+}
+
+ // ROARNET_PROVIDER_REVENUE_LEDGER_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS provider_revenue_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT NOT NULL UNIQUE,
+    provider TEXT NOT NULL DEFAULT 'manual',
+    month_key TEXT NOT NULL,
+    provider_bytes INTEGER NOT NULL CHECK(provider_bytes > 0),
+    net_cents INTEGER NOT NULL CHECK(net_cents > 0),
+    pool_cents INTEGER NOT NULL CHECK(pool_cents >= 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_provider_revenue_month
+    ON provider_revenue_batches(month_key);
+`);
+
+{
+  const columns = db.prepare('PRAGMA table_info(provider_revenue_batches)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE provider_revenue_batches ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+}
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS customers (
@@ -175,6 +211,30 @@ db.exec(`
   `);
 }
 // END ROARNET_AUTOMATIC_PARTICIPANT_DEVICE_REGISTRATION_V1
+
+
+
+
+// ROARNET_PROXIES_DEVICE_TEST_RECORDS_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS proxies_device_test_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL REFERENCES nodes(id),
+    connection_type TEXT NOT NULL
+      CHECK(connection_type IN ('personal_sim','personal_home')),
+    device_ownership_confirmed INTEGER NOT NULL CHECK(device_ownership_confirmed=1),
+    connection_ownership_confirmed INTEGER NOT NULL CHECK(connection_ownership_confirmed=1),
+    no_shared_or_hosted_connection INTEGER NOT NULL CHECK(no_shared_or_hosted_connection=1),
+    sdk_version TEXT NOT NULL,
+    sdk_status TEXT NOT NULL,
+    sdk_is_running INTEGER NOT NULL CHECK(sdk_is_running IN (0,1)),
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_proxies_device_tests_node_created
+    ON proxies_device_test_records(node_id, created_at DESC);
+`);
+// END ROARNET_PROXIES_DEVICE_TEST_RECORDS_V1
 
 // ROARNET_PROVIDER_DEVICE_BINDINGS_V1
 db.exec(`
@@ -261,6 +321,7 @@ db.exec(`
     contribution_bytes INTEGER NOT NULL CHECK(contribution_bytes > 0),
     revenue_cents INTEGER NOT NULL CHECK(revenue_cents >= 0),
     pool_cents INTEGER NOT NULL CHECK(pool_cents >= 0),
+    owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0),
     amount_cents INTEGER NOT NULL CHECK(amount_cents >= 0),
     created_at TEXT NOT NULL
   );
@@ -271,6 +332,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_earning_entries_participant
     ON participant_earning_entries(participant_id, month_key);
 `);
+
+{
+  const columns = db.prepare('PRAGMA table_info(participant_earning_entries)').all().map(c => c.name);
+  if (!columns.includes('owner_share_cents')) {
+    db.exec('ALTER TABLE participant_earning_entries ADD COLUMN owner_share_cents INTEGER CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)');
+  }
+}
 
 
 // ROARNET_SALES_V1
@@ -523,6 +591,8 @@ async function participantDeviceFor(req, deviceId) {
   return { participant, device };
 }
 
+const MAX_ACTIVE_PARTICIPANT_DEVICES = 10;
+
 const participantLoginAttempts = new Map();
 
 function customerBalance(customerId) {
@@ -604,8 +674,8 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
     const insertEarningEntry = db.prepare(`
       INSERT INTO participant_earning_entries(
         allocation_id,event_id,order_id,participant_id,month_key,
-        contribution_bytes,revenue_cents,pool_cents,amount_cents,created_at
-      ) VALUES(?,?,?,?,?,?,?,?,?,?)
+        contribution_bytes,revenue_cents,pool_cents,owner_share_cents,amount_cents,created_at
+      ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
     `);
 
     for (const order of orders) {
@@ -638,14 +708,15 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
       const cumulativeRevenue = (netCents * cumulativeBytes) / packageBytes;
       const revenueDelta = cumulativeRevenue - previousRevenue;
 
-      const previousPool = (netCents * 15n * previousBytes) / (100n * packageBytes);
-      const cumulativePool = (netCents * 15n * cumulativeBytes) / (100n * packageBytes);
+      const previousPool = (netCents * 50n * previousBytes) / (100n * packageBytes);
+      const cumulativePool = (netCents * 50n * cumulativeBytes) / (100n * packageBytes);
       const poolDelta = cumulativePool - previousPool;
 
+      const ownerDelta = revenueDelta - poolDelta;
       const participantId = node.participant_id ?? null;
       const amountCents = participantId ? poolDelta : 0n;
 
-      for (const value of [revenueDelta, poolDelta, amountCents]) {
+      for (const value of [revenueDelta, poolDelta, ownerDelta, amountCents]) {
         if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
           throw new Error('ACCOUNTING_AMOUNT_OUT_OF_SAFE_RANGE');
         }
@@ -664,6 +735,7 @@ function recordTrafficEventWithFifo({reference, nodeId, customerId, bytes, month
         allocated,
         Number(revenueDelta),
         Number(poolDelta),
+        Number(ownerDelta),
         Number(amountCents),
         now()
       );
@@ -727,6 +799,38 @@ db.exec(`
   `);
 }
 
+
+
+// ROARNET_SECURITY_EVENTS_V1
+db.exec(`
+  CREATE TABLE IF NOT EXISTS security_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK(severity IN ('low','medium','high','critical')),
+    action TEXT NOT NULL,
+    reason_code TEXT NOT NULL,
+    session_id TEXT,
+    device_id TEXT,
+    participant_id TEXT,
+    customer_id TEXT,
+    destination_host TEXT,
+    destination_port INTEGER,
+    detector TEXT NOT NULL,
+    dedupe_key TEXT NOT NULL UNIQUE,
+    occurred_at TEXT NOT NULL,
+    metadata_json TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_security_events_time
+    ON security_events(occurred_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_security_events_severity_time
+    ON security_events(severity, occurred_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_security_events_session
+    ON security_events(session_id);
+`);
+// END ROARNET_SECURITY_EVENTS_V1
 
 // ROARNET_RELAY_SESSIONS_V1
 db.exec(`
@@ -902,9 +1006,216 @@ if (typeof relaySessionExpiryTimer.unref === 'function') {
 }
 // END ROARNET_RELAY_SESSION_EXPIRY_V1
 
+
+
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+
+    // ROARNET_SECURITY_EVENTS_API_V1
+    if (
+      req.method === 'POST' &&
+      url.pathname === '/api/internal/security-events'
+    ) {
+      const supplied = bearer(req);
+      const suppliedGatewayId = String(
+        req.headers['x-roarnet-gateway-id'] || ''
+      );
+      const expectedToken = RELAY_GATEWAY_TOKEN;
+      const expectedGatewayId = RELAY_GATEWAY_ID;
+
+      if (
+        expectedToken.length < 32 ||
+        expectedGatewayId.length < 3 ||
+        supplied.length < 32 ||
+        suppliedGatewayId !== expectedGatewayId ||
+        !crypto.timingSafeEqual(
+          Buffer.from(hash(supplied)),
+          Buffer.from(hash(expectedToken))
+        )
+      ) {
+        return json(res, 401, { error: 'Unauthorized gateway' });
+      }
+
+      const data = await body(req);
+      const eventType = String(data.eventType || '');
+      const severity = String(data.severity || '');
+      const reasonCode = String(data.reasonCode || '');
+      const dedupeKey = String(data.dedupeKey || '');
+
+      if (
+        !['DESTINATION_BLOCKED',
+          'AUTHENTICATION_ABUSE_BLOCKED',
+          'SESSION_OWNERSHIP_ABUSE_BLOCKED'].includes(eventType) ||
+        !['low', 'medium', 'high', 'critical'].includes(severity) ||
+        !/^[A-Z0-9_]{3,100}$/.test(reasonCode) ||
+        !/^[a-f0-9]{64}$/.test(dedupeKey)
+      ) {
+        return json(res, 400, { error: 'Invalid security event' });
+      }
+
+      let sessionId = null;
+      let deviceId = null;
+      let participantId = null;
+      let customerId = null;
+      let destinationHost = null;
+      let destinationPort = null;
+      let detector = '';
+      let metadata = { gatewayId: suppliedGatewayId };
+
+      if (eventType === 'DESTINATION_BLOCKED') {
+        sessionId = String(data.sessionId || '').slice(0, 100);
+        deviceId = String(data.deviceId || '').slice(0, 100);
+        destinationHost = String(data.destinationHost || '')
+          .trim().toLowerCase().slice(0, 253);
+        destinationPort = Number(data.destinationPort);
+
+        if (
+          !sessionId ||
+          !deviceId ||
+          !destinationHost ||
+          !Number.isInteger(destinationPort) ||
+          destinationPort < 1 ||
+          destinationPort > 65535
+        ) {
+          return json(res, 400, { error: 'Invalid security event' });
+        }
+
+        const session = db.prepare(`
+          SELECT session_id, device_id, participant_id, customer_id
+          FROM relay_sessions
+          WHERE session_id = ? AND device_id = ?
+        `).get(sessionId, deviceId);
+
+        if (!session) {
+          return json(res, 404, { error: 'Session context not found' });
+        }
+
+        sessionId = session.session_id;
+        deviceId = session.device_id;
+        participantId = session.participant_id || null;
+        customerId = session.customer_id || null;
+        detector = 'destination-policy';
+      } else {
+        const isAuth =
+          eventType === 'AUTHENTICATION_ABUSE_BLOCKED';
+
+        const expectedReason = isAuth
+          ? 'AUTHENTICATION_ABUSE_THRESHOLD'
+          : 'SESSION_OWNERSHIP_ABUSE_THRESHOLD';
+
+        const expectedCooldown = isAuth ? 120000 : 300000;
+        const expectedThreshold = isAuth ? 30 : 8;
+        const suppliedMetadata = data.metadata;
+
+        if (
+          severity !== 'high' ||
+          reasonCode !== expectedReason ||
+          !suppliedMetadata ||
+          typeof suppliedMetadata !== 'object' ||
+          Array.isArray(suppliedMetadata) ||
+          !/^[a-f0-9]{64}$/.test(
+            String(suppliedMetadata.sourceHash || '')
+          ) ||
+          suppliedMetadata.threshold !== expectedThreshold ||
+          suppliedMetadata.windowMs !== 60000 ||
+          suppliedMetadata.cooldownMs !== expectedCooldown ||
+          typeof suppliedMetadata.route !== 'string' ||
+          !/^\/[A-Za-z0-9/_-]{1,119}$/.test(
+            suppliedMetadata.route
+          )
+        ) {
+          return json(res, 400, { error: 'Invalid abuse event' });
+        }
+
+        detector = isAuth
+          ? 'gateway-authentication-abuse'
+          : 'gateway-session-ownership-abuse';
+
+        metadata = {
+          gatewayId: suppliedGatewayId,
+          sourceHash: suppliedMetadata.sourceHash,
+          threshold: expectedThreshold,
+          windowMs: 60000,
+          cooldownMs: expectedCooldown,
+          route: suppliedMetadata.route
+        };
+      }
+
+      const result = db.prepare(`
+        INSERT OR IGNORE INTO security_events (
+          event_id, event_type, severity, action, reason_code,
+          session_id, device_id, participant_id, customer_id,
+          destination_host, destination_port, detector,
+          dedupe_key, occurred_at, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        crypto.randomUUID(),
+        eventType,
+        severity,
+        'blocked',
+        reasonCode,
+        sessionId,
+        deviceId,
+        participantId,
+        customerId,
+        destinationHost,
+        destinationPort,
+        detector,
+        dedupeKey,
+        now(),
+        JSON.stringify(metadata)
+      );
+
+      return json(res, 202, {
+        success: true,
+        recorded: Number(result.changes) === 1,
+        duplicate: Number(result.changes) === 0
+      });
+    }
+
+    if (
+      req.method === 'GET' &&
+      url.pathname === '/api/admin/security-events'
+    ) {
+      if (!isAdmin(req)) {
+        return json(res, 401, { error: 'Unauthorized' });
+      }
+
+      const requestedLimit = Number(url.searchParams.get('limit') || 100);
+      const limit = Math.max(
+        1,
+        Math.min(500, Number.isInteger(requestedLimit) ? requestedLimit : 100)
+      );
+
+      const events = db.prepare(`
+        SELECT event_id, event_type, severity, action, reason_code,
+          session_id, device_id, participant_id, customer_id,
+          destination_host, destination_port, detector, occurred_at
+        FROM security_events
+        ORDER BY occurred_at DESC
+        LIMIT ?
+      `).all(limit);
+
+      const counts = db.prepare(`
+        SELECT
+          COUNT(*) AS total,
+          SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS critical,
+          SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) AS high,
+          SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) AS medium,
+          SUM(CASE WHEN severity = 'low' THEN 1 ELSE 0 END) AS low
+        FROM security_events
+      `).get();
+
+      return json(res, 200, { success: true, counts, events });
+    }
+    // END ROARNET_SECURITY_EVENTS_API_V1
+
+
+
+
 
 
     // ROARNET_RELAY_SESSION_API_V1
@@ -1533,7 +1844,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const session = db.prepare(`
           SELECT session_id, status, provider_id, buyer_request_id,
-                 gateway_id, started_at, ended_at
+                 gateway_id, device_id, started_at, ended_at
           FROM relay_sessions
           WHERE session_id = ?
         `).get(sessionId);
@@ -1543,18 +1854,12 @@ const server = http.createServer(async (req, res) => {
           return json(res, 404, { error: 'SESSION_NOT_FOUND' });
         }
 
-        if (session.status === target &&
-            session.gateway_id === gatewayId) {
-          db.exec('COMMIT');
-          return json(res, 200, {
-            success: true,
-            reused: true,
-            sessionId,
-            status: target
-          });
-        }
+        const isIdempotentReplay =
+          session.status === target &&
+          session.gateway_id === gatewayId;
 
-        if (!(allowed[session.status] || []).includes(target)) {
+        if (!isIdempotentReplay &&
+            !(allowed[session.status] || []).includes(target)) {
           db.exec('ROLLBACK');
           return json(res, 409, {
             error: 'INVALID_SESSION_STATE_TRANSITION',
@@ -1576,11 +1881,109 @@ const server = http.createServer(async (req, res) => {
           });
         }
 
+        const agentReport = data.agentReport;
+        const agentReportHash = String(
+          data.agentReportHash || ''
+        ).toLowerCase();
+
+        let agentReportJson = null;
+
+        if (agentReport !== undefined) {
+          if (
+            !['FAILED', 'COMPLETED'].includes(target) ||
+            !agentReport ||
+            typeof agentReport !== 'object' ||
+            Array.isArray(agentReport) ||
+            agentReport.reportVersion !== 1 ||
+            agentReport.sessionId !== sessionId ||
+            agentReport.deviceId !== session.device_id ||
+            ![agentReport.bytesSent, agentReport.bytesReceived,
+              agentReport.totalBytes].every(
+                value => Number.isSafeInteger(value) && value >= 0
+              ) ||
+            !Number.isSafeInteger(
+              agentReport.bytesSent + agentReport.bytesReceived
+            ) ||
+            agentReport.bytesSent + agentReport.bytesReceived !==
+              agentReport.totalBytes ||
+            !/^[a-f0-9]{64}$/.test(agentReportHash)
+          ) {
+            db.exec('ROLLBACK');
+            return json(res, 400, {
+              error: 'INVALID_AGENT_TRAFFIC_REPORT'
+            });
+          }
+
+          const expectedAgentHash = crypto.createHash('sha256')
+            .update(JSON.stringify(agentReport), 'utf8')
+            .digest('hex');
+
+          if (expectedAgentHash !== agentReportHash) {
+            db.exec('ROLLBACK');
+            return json(res, 400, {
+              error: 'AGENT_REPORT_HASH_MISMATCH'
+            });
+          }
+
+          agentReportJson = JSON.stringify({
+            ...agentReport,
+            reportHash: agentReportHash,
+            gatewayId,
+            receivedAt: timestamp
+          });
+        }
+
+        const gatewayReport = data.gatewayReport;
+
+        if (target === 'COMPLETED') {
+          if (
+            !agentReport ||
+            !gatewayReport ||
+            typeof gatewayReport !== 'object' ||
+            Array.isArray(gatewayReport) ||
+            gatewayReport.reportVersion !== 1 ||
+            gatewayReport.sessionId !== sessionId ||
+            gatewayReport.deviceId !== session.device_id ||
+            gatewayReport.gatewayId !== gatewayId ||
+            gatewayReport.agentReportHash !== agentReportHash ||
+            gatewayReport.bytesSent !== agentReport.bytesSent ||
+            gatewayReport.bytesReceived !== agentReport.bytesReceived ||
+            gatewayReport.totalBytes !== agentReport.totalBytes
+          ) {
+            db.exec('ROLLBACK');
+            return json(res, 400, {
+              error: 'GATEWAY_AGENT_REPORT_MISMATCH'
+            });
+          }
+
+          const expectedGatewayHash = crypto.createHash('sha256')
+            .update(JSON.stringify(gatewayReport), 'utf8')
+            .digest('hex');
+
+          if (expectedGatewayHash !== reportHash) {
+            db.exec('ROLLBACK');
+            return json(res, 400, {
+              error: 'GATEWAY_REPORT_HASH_MISMATCH'
+            });
+          }
+        }
+
+        if (isIdempotentReplay) {
+          db.exec('COMMIT');
+          return json(res, 200, {
+            success: true,
+            reused: true,
+            sessionId,
+            status: target
+          });
+        }
+
         const reportJson = target === 'COMPLETED'
           ? JSON.stringify({
               gatewayId,
               reportHash,
-              receivedAt: timestamp
+              receivedAt: timestamp,
+              gatewayReport
             })
           : null;
 
@@ -1600,6 +2003,11 @@ const server = http.createServer(async (req, res) => {
               END,
               gateway_report_hash = COALESCE(?, gateway_report_hash),
               gateway_report_json = COALESCE(?, gateway_report_json),
+              agent_report_hash = COALESCE(?, agent_report_hash),
+              agent_report_json = COALESCE(?, agent_report_json),
+              bytes_sent = COALESCE(?, bytes_sent),
+              bytes_received = COALESCE(?, bytes_received),
+              total_bytes = COALESCE(?, total_bytes),
               reconciliation_status = CASE
                 WHEN ? = 'COMPLETED' THEN 'pending'
                 ELSE reconciliation_status
@@ -1616,6 +2024,11 @@ const server = http.createServer(async (req, res) => {
           timestamp,
           target === 'COMPLETED' ? reportHash : null,
           reportJson,
+          agentReport ? agentReportHash : null,
+          agentReportJson,
+          agentReport ? agentReport.bytesSent : null,
+          agentReport ? agentReport.bytesReceived : null,
+          agentReport ? agentReport.totalBytes : null,
           target,
           target === 'FAILED' ? failureCode : null,
           sessionId,
@@ -1745,7 +2158,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ROARNET_UNIFIED_UI_V1
-    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/admin')) {
+    if (req.method === 'GET' && url.pathname === '/') {
       addPageVisit.run(getBaghdadDay(), now());
       const page = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
       res.writeHead(200, {
@@ -1754,7 +2167,7 @@ const server = http.createServer(async (req, res) => {
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://bauval.org; frame-src 'self' https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bauval.org; img-src 'self' data: https://bauval.org; base-uri 'none'; frame-ancestors 'none'"
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://bauval.org https://esm.sh; frame-src 'self' https:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://bauval.org https://bsmumxfajnzhziezxfth.supabase.co wss://bsmumxfajnzhziezxfth.supabase.co; img-src 'self' data: https://bauval.org; base-uri 'none'; frame-ancestors 'none'"
       });
       return res.end(page);
     }
@@ -2044,7 +2457,8 @@ const server = http.createServer(async (req, res) => {
 
       const withdrawals = db.prepare(`
         SELECT id, amount_cents, status, created_at,
-               updated_at, processed_at, payout_reference
+               updated_at, processed_at, payout_reference,
+               payout_method
         FROM withdrawal_requests
         WHERE participant_id = ?
         ORDER BY id DESC
@@ -2072,6 +2486,11 @@ const server = http.createServer(async (req, res) => {
       const b = await body(req);
       const amountCents = Number(b.amountCents);
       const destinationAddress = String(b.destinationAddress || '').trim();
+      const payoutMethod = String(b.payoutMethod || 'usdt_trc20').trim().toLowerCase();
+
+      if (!['usdt_trc20', 'paypal', 'zaincash', 'venmo'].includes(payoutMethod)) {
+        return json(res, 400, { error: 'Unsupported payout method' });
+      }
 
       if (!Number.isSafeInteger(amountCents) || amountCents < 100) {
         return json(res, 400, {
@@ -2079,8 +2498,25 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(destinationAddress)) {
-        return json(res, 400, { error: 'Invalid TRC20 address format' });
+      const normalizedDestination = destinationAddress.replace(/[\s-]/g, '');
+
+      const validDestination = {
+        paypal: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destinationAddress),
+        usdt_trc20: /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(destinationAddress),
+        zaincash: /^(?:\+964|00964|0)?7\d{9}$/.test(normalizedDestination),
+        venmo: /^@?[A-Za-z0-9_-]{5,30}$/.test(destinationAddress)
+      }[payoutMethod];
+
+      if (!validDestination) {
+        const errors = {
+          paypal: 'Invalid PayPal email address',
+          usdt_trc20: 'Invalid TRC20 address format',
+          zaincash: 'Invalid Iraqi ZainCash phone number',
+          venmo: 'Invalid Venmo username'
+        };
+        return json(res, 400, {
+          error: errors[payoutMethod] || 'Invalid payout destination'
+        });
       }
 
       db.exec('BEGIN IMMEDIATE');
@@ -2113,9 +2549,23 @@ const server = http.createServer(async (req, res) => {
 
         const result = db.prepare(`
           INSERT INTO withdrawal_requests
-            (participant_id, amount_cents, destination_address, network, status, created_at, updated_at)
-          VALUES (?, ?, ?, 'TRC20', 'queued', ?, ?)
-        `).run(p.id, amountCents, destinationAddress, timestamp, timestamp);
+            (participant_id, amount_cents, destination_address, payout_method,
+             network, status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)
+        `).run(
+          p.id,
+          amountCents,
+          destinationAddress,
+          payoutMethod,
+          ({
+            paypal: 'PAYPAL',
+            usdt_trc20: 'TRC20',
+            zaincash: 'ZAINCASH',
+            venmo: 'VENMO'
+          })[payoutMethod],
+          timestamp,
+          timestamp
+        );
 
         db.exec('COMMIT');
 
@@ -2135,6 +2585,9 @@ const server = http.createServer(async (req, res) => {
       }
     }
     // END ROARNET_WITHDRAWAL_SYSTEM_V1
+
+
+
 
 
     // ROARNET_AUTOMATIC_PARTICIPANT_DEVICE_REGISTRATION_V1
@@ -2194,6 +2647,19 @@ const server = http.createServer(async (req, res) => {
               label,
               status: existing.status
             }
+          });
+        }
+
+        const activeDeviceCount = Number(db.prepare(
+          "SELECT COUNT(*) AS n FROM nodes WHERE participant_id=? AND status='active'"
+        ).get(participant.id).n);
+
+        if (activeDeviceCount >= MAX_ACTIVE_PARTICIPANT_DEVICES) {
+          db.exec('ROLLBACK');
+          return json(res, 409, {
+            error: 'DEVICE_LIMIT_REACHED',
+            limit: MAX_ACTIVE_PARTICIPANT_DEVICES,
+            activeDevices: activeDeviceCount
           });
         }
 
@@ -2267,6 +2733,21 @@ const server = http.createServer(async (req, res) => {
           return json(res, 409, { error: 'Device belongs to another account' });
         }
 
+        if (!node.participant_id) {
+          const activeDeviceCount = Number(db.prepare(
+            "SELECT COUNT(*) AS n FROM nodes WHERE participant_id=? AND status='active'"
+          ).get(p.id).n);
+
+          if (activeDeviceCount >= MAX_ACTIVE_PARTICIPANT_DEVICES) {
+            db.exec('ROLLBACK');
+            return json(res, 409, {
+              error: 'DEVICE_LIMIT_REACHED',
+              limit: MAX_ACTIVE_PARTICIPANT_DEVICES,
+              activeDevices: activeDeviceCount
+            });
+          }
+        }
+
         db.prepare(
           "UPDATE nodes SET participant_id=? WHERE id=? AND (participant_id IS NULL OR participant_id=?)"
         ).run(p.id, node.id, p.id);
@@ -2308,9 +2789,45 @@ const server = http.createServer(async (req, res) => {
       if (participantId && !db.prepare("SELECT id FROM participants WHERE id=? AND status='active'").get(participantId))
         return json(res, 400, { error: 'Invalid participantId' });
 
-      db.prepare("UPDATE nodes SET participant_id=? WHERE id=?")
-        .run(participantId, nodeId);
-      return json(res, 200, { success: true, nodeId, participantId });
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        const currentNode = db.prepare(
+          'SELECT id,status,participant_id FROM nodes WHERE id=?'
+        ).get(nodeId);
+
+        if (!currentNode) {
+          db.exec('ROLLBACK');
+          return json(res, 404, { error: 'Node not found' });
+        }
+
+        if (
+          participantId &&
+          currentNode.status === 'active' &&
+          currentNode.participant_id !== participantId
+        ) {
+          const activeDeviceCount = Number(db.prepare(
+            "SELECT COUNT(*) AS n FROM nodes WHERE participant_id=? AND status='active'"
+          ).get(participantId).n);
+
+          if (activeDeviceCount >= MAX_ACTIVE_PARTICIPANT_DEVICES) {
+            db.exec('ROLLBACK');
+            return json(res, 409, {
+              error: 'DEVICE_LIMIT_REACHED',
+              limit: MAX_ACTIVE_PARTICIPANT_DEVICES,
+              activeDevices: activeDeviceCount
+            });
+          }
+        }
+
+        db.prepare("UPDATE nodes SET participant_id=? WHERE id=?")
+          .run(participantId, nodeId);
+
+        db.exec('COMMIT');
+        return json(res, 200, { success: true, nodeId, participantId });
+      } catch (error) {
+        try { db.exec('ROLLBACK'); } catch {}
+        throw error;
+      }
     }
 
     // ROARNET_MY_CONTRIBUTIONS_V1
@@ -2756,6 +3273,117 @@ const server = http.createServer(async (req, res) => {
         revokedAt
       });
     }
+
+
+    // ROARNET_PROXIES_DEVICE_TEST_API_V1
+    const proxiesDeviceTestPath = '/api/participant/device/proxies-test';
+
+    if (url.pathname === proxiesDeviceTestPath &&
+        req.method === 'GET') {
+      const auth = await participantDeviceFor(
+        req, url.searchParams.get('deviceId')
+      );
+
+      if (auth.error) {
+        const status = auth.error === 'PARTICIPANT_SESSION_INVALID' ? 401 :
+          auth.error === 'DEVICE_ID_REQUIRED' ? 400 : 403;
+        return json(res, status, { error: auth.error });
+      }
+
+      const records = db.prepare(`
+        SELECT id,connection_type,device_ownership_confirmed,
+               connection_ownership_confirmed,no_shared_or_hosted_connection,
+               sdk_version,sdk_status,sdk_is_running,created_at
+        FROM proxies_device_test_records
+        WHERE node_id=?
+        ORDER BY created_at DESC,id DESC
+        LIMIT 20
+      `).all(auth.device.id);
+
+      return json(res, 200, {
+        ok: true,
+        device: {
+          id: auth.device.id,
+          label: auth.device.label,
+          status: auth.device.status
+        },
+        records
+      });
+    }
+
+    if (url.pathname === proxiesDeviceTestPath &&
+        req.method === 'POST') {
+      const data = await body(req);
+      const auth = await participantDeviceFor(req, data.deviceId);
+
+      if (auth.error) {
+        const status = auth.error === 'PARTICIPANT_SESSION_INVALID' ? 401 :
+          auth.error === 'DEVICE_ID_REQUIRED' ? 400 : 403;
+        return json(res, status, { error: auth.error });
+      }
+
+      const connectionType = String(data.connectionType || '').trim();
+      const sdkVersion = String(data.sdkVersion || '').trim();
+      const sdkStatus = String(data.sdkStatus || '').trim();
+
+      if (!['personal_sim', 'personal_home'].includes(connectionType)) {
+        return json(res, 400, { error: 'INVALID_CONNECTION_TYPE' });
+      }
+
+      if (data.deviceOwnershipConfirmed !== true ||
+          data.connectionOwnershipConfirmed !== true ||
+          data.noSharedOrHostedConnection !== true) {
+        return json(res, 400, {
+          error: 'ALL_DEVICE_AND_CONNECTION_DECLARATIONS_REQUIRED'
+        });
+      }
+
+      if (sdkVersion !== '1.3.2') {
+        return json(res, 400, {
+          error: 'UNSUPPORTED_SDK_VERSION',
+          expectedSdkVersion: '1.3.2'
+        });
+      }
+
+      const allowedSdkStatuses = [
+        'NOT_INITIALIZED', 'UNKNOWN', 'STOPPED',
+        'CONNECTING', 'CONNECTED', 'ERROR'
+      ];
+
+      if (!allowedSdkStatuses.includes(sdkStatus) ||
+          typeof data.sdkIsRunning !== 'boolean') {
+        return json(res, 400, { error: 'INVALID_SDK_STATUS' });
+      }
+
+      const createdAt = now();
+
+      const result = db.prepare(`
+        INSERT INTO proxies_device_test_records (
+          node_id,connection_type,
+          device_ownership_confirmed,connection_ownership_confirmed,
+          no_shared_or_hosted_connection,
+          sdk_version,sdk_status,sdk_is_running,created_at
+        ) VALUES (?,?,1,1,1,?,?,?,?)
+      `).run(
+        auth.device.id,
+        connectionType,
+        sdkVersion,
+        sdkStatus,
+        data.sdkIsRunning ? 1 : 0,
+        createdAt
+      );
+
+      return json(res, 201, {
+        ok: true,
+        recordId: Number(result.lastInsertRowid),
+        deviceId: auth.device.id,
+        createdAt,
+        sdkVersion,
+        sdkStatus,
+        sdkIsRunning: data.sdkIsRunning
+      });
+    }
+    // END ROARNET_PROXIES_DEVICE_TEST_API_V1
 
     if (req.method === 'POST' && url.pathname === '/api/meter') {
       const node = nodeFor(req);
@@ -3432,6 +4060,8 @@ const server = http.createServer(async (req, res) => {
       }
       const netCents = Math.round(netUsd * 100);
       if (!Number.isSafeInteger(netCents) || netCents < 1) return json(res, 400, { error: 'Invalid net amount precision' });
+      const participantCents = Math.floor(netCents * 50 / 100);
+      const ownerCents = netCents - participantCents;
       const order = db.prepare('SELECT * FROM orders WHERE id=?').get(confirmOrderMatch[1]);
       if (!order) return json(res, 404, { error: 'Order not found' });
       if (order.status !== 'pending') return json(res, 409, { error: 'Order is not pending' });
@@ -3441,8 +4071,11 @@ const server = http.createServer(async (req, res) => {
         const changed = db.prepare("UPDATE orders SET status='paid',payment_provider=?,payment_reference=?,net_cents=?,paid_at=? WHERE id=? AND status='pending'")
           .run(provider, paymentReference, netCents, now(), order.id);
         if (Number(changed.changes) !== 1) throw new Error('ORDER_STATE_CHANGED');
-        db.prepare('INSERT INTO net_revenue(reference,net_cents,created_at,order_id) VALUES(?,?,?,?)')
-          .run('roarnet-order-' + order.id, netCents, now(), order.id);
+        db.prepare(`INSERT INTO net_revenue(
+          reference,net_cents,created_at,order_id,owner_share_cents,participant_pool_cents
+        ) VALUES(?,?,?,?,?,?)`).run(
+          'roarnet-order-' + order.id, netCents, now(), order.id, ownerCents, participantCents
+        );
         db.exec('COMMIT');
       } catch (e) {
         try { db.exec('ROLLBACK'); } catch {}
@@ -3450,16 +4083,14 @@ const server = http.createServer(async (req, res) => {
         if (e.message === 'ORDER_STATE_CHANGED') return json(res, 409, { error: 'Order state changed; reload orders' });
         throw e;
       }
-      const ownerCents = Math.floor(netCents * 80 / 100);
-      const participantCents = Math.floor(netCents * 15 / 100);
-      const reserveCents = netCents - ownerCents - participantCents;
+      const reserveCents = 0;
       return json(res, 200, {
         ok: true, orderId: order.id, status: 'paid',
         grossUsd: Number((Number(order.price_cents) / 100).toFixed(2)),
         verifiedNetUsd: Number((netCents / 100).toFixed(2)),
-        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
-        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
-        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
+        ownerShare50Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool50Usd: Number((participantCents / 100).toFixed(2)),
+        operatingReserve0Usd: Number((reserveCents / 100).toFixed(2)),
         note: 'Manual confirmation only: use after independently verifying the funds arrived. This endpoint does not contact a payment provider or send payouts.'
       });
     }
@@ -3499,15 +4130,46 @@ const server = http.createServer(async (req, res) => {
         return json(res, 400, { error: 'Status must be active or inactive' });
       }
 
-      const result = db.prepare(
-        'UPDATE nodes SET status=? WHERE id=?'
-      ).run(status, statusMatch[1]);
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        const currentNode = db.prepare(
+          'SELECT id,status,participant_id FROM nodes WHERE id=?'
+        ).get(statusMatch[1]);
 
-      if (Number(result.changes) !== 1) {
-        return json(res, 404, { error: 'Node not found' });
+        if (!currentNode) {
+          db.exec('ROLLBACK');
+          return json(res, 404, { error: 'Node not found' });
+        }
+
+        if (
+          status === 'active' &&
+          currentNode.status !== 'active' &&
+          currentNode.participant_id
+        ) {
+          const activeDeviceCount = Number(db.prepare(
+            "SELECT COUNT(*) AS n FROM nodes WHERE participant_id=? AND status='active'"
+          ).get(currentNode.participant_id).n);
+
+          if (activeDeviceCount >= MAX_ACTIVE_PARTICIPANT_DEVICES) {
+            db.exec('ROLLBACK');
+            return json(res, 409, {
+              error: 'DEVICE_LIMIT_REACHED',
+              limit: MAX_ACTIVE_PARTICIPANT_DEVICES,
+              activeDevices: activeDeviceCount
+            });
+          }
+        }
+
+        db.prepare(
+          'UPDATE nodes SET status=? WHERE id=?'
+        ).run(status, statusMatch[1]);
+
+        db.exec('COMMIT');
+        return json(res, 200, { ok: true, id: statusMatch[1], status });
+      } catch (error) {
+        try { db.exec('ROLLBACK'); } catch {}
+        throw error;
       }
-
-      return json(res, 200, { ok: true, id: statusMatch[1], status });
     }
 
 
@@ -3518,7 +4180,7 @@ const server = http.createServer(async (req, res) => {
 
       const withdrawals = db.prepare(`
         SELECT id, participant_id, amount_cents, destination_address,
-               network, status, attempt_count, last_error,
+               payout_method, network, status, attempt_count, last_error,
                created_at, updated_at, processed_at,
                payout_reference, admin_note
         FROM withdrawal_requests
@@ -3557,11 +4219,26 @@ const server = http.createServer(async (req, res) => {
         return json(res, 400, { error: 'Invalid withdrawal status' });
       }
 
-      if (status === 'paid' &&
-          !/^[a-fA-F0-9]{64}$/.test(payoutReference)) {
-        return json(res, 400, {
-          error: 'A valid 64-character TRON transaction hash is required'
-        });
+      const payoutMethodRow = db.prepare(`
+        SELECT payout_method
+        FROM withdrawal_requests
+        WHERE id=?
+      `).get(withdrawalId);
+
+      const payoutMethod = payoutMethodRow?.payout_method || 'usdt_trc20';
+
+      if (status === 'paid') {
+        const validReference = payoutMethod === 'usdt_trc20'
+          ? /^[a-fA-F0-9]{64}$/.test(payoutReference)
+          : payoutReference.length >= 3 && payoutReference.length <= 200;
+
+        if (!validReference) {
+          return json(res, 400, {
+            error: payoutMethod === 'usdt_trc20'
+              ? 'A valid 64-character TRON transaction hash is required'
+              : 'A valid payout reference between 3 and 200 characters is required'
+          });
+        }
       }
 
       if (status === 'failed' && adminNote.length < 3) {
@@ -3651,6 +4328,121 @@ const server = http.createServer(async (req, res) => {
 
     // END ROARNET_ADMIN_WITHDRAWAL_MANAGEMENT_V1
 
+    // ROARNET_PROVIDER_REVENUE_BATCH_API_V1
+    if (url.pathname === '/api/admin/provider-revenue-batches' &&
+        req.method === 'GET') {
+      const rows = db.prepare(`
+        SELECT id, reference, provider, month_key,
+               provider_bytes, net_cents, pool_cents, owner_share_cents, created_at
+        FROM provider_revenue_batches
+        ORDER BY id DESC
+        LIMIT 100
+      `).all();
+
+      return json(res, 200, {
+        batches: rows.map(row => ({
+          batchId: Number(row.id),
+          reference: row.reference,
+          provider: row.provider,
+          month: row.month_key,
+          providerBytes: Number(row.provider_bytes),
+          netUsd: Number((row.net_cents / 100).toFixed(2)),
+          participantPoolUsd: Number((row.pool_cents / 100).toFixed(2)),
+          ownerShareUsd: row.owner_share_cents === null ? null : Number((row.owner_share_cents / 100).toFixed(2)),
+          createdAt: row.created_at
+        }))
+      });
+    }
+
+    if (url.pathname === '/api/admin/provider-revenue-batches' &&
+        req.method === 'POST') {
+      const b = await body(req);
+      const reference = String(b.reference || '').trim();
+      const month = String(b.month || '');
+      const providerBytes = Number(b.providerBytes);
+      const amount = Number(b.netUsd);
+
+      if (!/^[A-Za-z0-9_.:-]{8,120}$/.test(reference) ||
+          !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ||
+          !Number.isSafeInteger(providerBytes) || providerBytes <= 0 ||
+          !Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
+        return json(res, 400, { error: 'Invalid provider revenue batch fields' });
+      }
+
+      const cents = Math.round(amount * 100);
+      if (!Number.isSafeInteger(cents) || cents < 1) {
+        return json(res, 400, { error: 'Invalid amount precision' });
+      }
+
+      const closedMonth = db.prepare(`
+        SELECT 1 FROM settlement_batches
+        WHERE month_key = ? AND status = 'completed'
+      `).get(month);
+
+      if (closedMonth) {
+        return json(res, 409, {
+          error: 'This month has already been settled',
+          month
+        });
+      }
+
+      const poolCents = Math.floor(cents * 50 / 100);
+      const timestamp = now();
+
+      try {
+        db.exec('BEGIN IMMEDIATE');
+
+        const result = db.prepare(`
+          INSERT INTO provider_revenue_batches
+            (reference, provider, month_key, provider_bytes,
+             net_cents, pool_cents, owner_share_cents, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          reference,
+          String(b.provider || 'manual').slice(0, 80),
+          month,
+          providerBytes,
+          cents,
+          poolCents,
+          cents - poolCents,
+          timestamp
+        );
+
+        db.prepare(`
+          INSERT INTO net_revenue(
+            reference, net_cents, created_at,
+            owner_share_cents, participant_pool_cents
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `).run(
+          'provider:' + reference, cents, timestamp, cents - poolCents, poolCents
+        );
+
+        db.exec('COMMIT');
+
+        const ownerCents = cents - poolCents;
+        const reserveCents = 0;
+
+        return json(res, 201, {
+          ok: true,
+          batchId: Number(result.lastInsertRowid),
+          reference,
+          month,
+          recordedNetUsd: cents / 100,
+          ownerShare50Usd: ownerCents / 100,
+          participantPool50Usd: poolCents / 100,
+          operatingReserve0Usd: reserveCents / 100,
+          participantPoolStatus: 'unallocated'
+        });
+      } catch (e) {
+        try { db.exec('ROLLBACK'); } catch (_) {}
+        if (String(e.message).includes('UNIQUE')) {
+          return json(res, 409, { error: 'Duplicate provider revenue reference' });
+        }
+        throw e;
+      }
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/admin/settlements') {
       const rows = db.prepare(`
         SELECT month_key, revenue_cents, owner_share_cents,
@@ -3671,10 +4463,21 @@ const server = http.createServer(async (req, res) => {
         const entries = db.prepare(`
           SELECT COALESCE(SUM(revenue_cents),0) revenue,
                  COALESCE(SUM(pool_cents),0) pool,
+                 COALESCE(SUM(owner_share_cents),0) owner,
+                 COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END),0) owner_unknown,
                  COALESCE(SUM(amount_cents),0) allocated,
                  COUNT(*) entry_count
           FROM participant_earning_entries
           WHERE substr(month_key,1,7)=?
+        `).get(monthKey);
+
+        const providerTotals = db.prepare(`
+          SELECT COALESCE(SUM(net_cents),0) revenue,
+                 COALESCE(SUM(pool_cents),0) pool,
+                 COALESCE(SUM(owner_share_cents),0) owner,
+                 COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END),0) owner_unknown
+          FROM provider_revenue_batches
+          WHERE month_key=?
         `).get(monthKey);
 
         const earnings = db.prepare(`
@@ -3709,20 +4512,31 @@ const server = http.createServer(async (req, res) => {
         const allocated = bi(batch.allocated_cents);
         const unallocated = bi(batch.unallocated_cents);
 
-        const expectedOwner = revenue * 80n / 100n;
-        const expectedReserve = revenue - expectedOwner - pool;
+        const ownerUnknown = Number(entries.owner_unknown || 0) +
+          Number(providerTotals.owner_unknown || 0);
+        const expectedOwner = bi(entries.owner) + bi(providerTotals.owner);
 
-        compare('إيراد القيود لا يطابق التسوية', entries.revenue, revenue);
-        compare('حصة المشاركين لا تطابق القيود', entries.pool, pool);
+        compare(
+          'إيراد القيود والمزودين لا يطابق التسوية',
+          bi(entries.revenue) + bi(providerTotals.revenue),
+          revenue
+        );
+        compare(
+          'حصة المشاركين لا تطابق القيود ومخصصات المزودين',
+          bi(entries.pool) + bi(providerTotals.pool),
+          pool
+        );
         compare('الموزع في القيود لا يطابق التسوية', entries.allocated, allocated);
         compare('إجمالي أرباح المشاركين لا يطابق الموزع', earnings.allocated, allocated);
-        compare('حصة المالك لا تساوي 80%', owner, expectedOwner);
-        compare('احتياطي التشغيل لا يطابق المتبقي', reserve, expectedReserve);
-        compare('مجموع الحصص لا يساوي الإيراد', revenue, owner + pool + reserve);
+        if (ownerUnknown === 0) {
+          compare('حصة المالك لا تطابق لقطات القيود المحفوظة', owner, expectedOwner);
+        }
+        if (batch.owner_share_cents !== null &&
+            batch.operating_reserve_cents !== null) {
+          compare('مجموع الحصص لا يساوي الإيراد', revenue, owner + pool + reserve);
+        }
         compare('الموزع وغير الموزع لا يساويان حصة المشاركين',
                 pool, allocated + unallocated);
-
-        if (expectedReserve < 0n) issues.push('احتياطي التشغيل سالب');
 
         const sourceMap = new Map(sourceRows.map(r => [String(r.participant_id), r]));
         const earningMap = new Map(earningRows.map(r => [String(r.participant_id), r]));
@@ -3762,6 +4576,8 @@ const server = http.createServer(async (req, res) => {
           issues,
           checkedParticipants: ids.size,
           checkedEntries: Number(entries.entry_count || 0),
+          ownerSnapshotStatus: ownerUnknown === 0 ? 'verified' : 'historical-snapshot-unavailable',
+          ownerSnapshotUnknownRows: ownerUnknown,
           orderMismatches
         };
       };
@@ -3770,9 +4586,9 @@ const server = http.createServer(async (req, res) => {
         settlements: rows.map(row => ({
           monthKey: String(row.month_key),
           revenueUsd: Number((Number(row.revenue_cents)/100).toFixed(2)),
-          ownerShareUsd: Number((Number(row.owner_share_cents)/100).toFixed(2)),
+          ownerShareUsd: row.owner_share_cents === null ? null : Number((Number(row.owner_share_cents)/100).toFixed(2)),
           participantPoolUsd: Number((Number(row.participant_pool_cents)/100).toFixed(2)),
-          operatingReserveUsd: Number((Number(row.operating_reserve_cents)/100).toFixed(2)),
+          operatingReserveUsd: row.operating_reserve_cents === null ? null : Number((Number(row.operating_reserve_cents)/100).toFixed(2)),
           allocatedUsd: Number((Number(row.allocated_cents)/100).toFixed(2)),
           unallocatedUsd: Number((Number(row.unallocated_cents)/100).toFixed(2)),
           completedAt: row.completed_at,
@@ -3788,17 +4604,26 @@ const server = http.createServer(async (req, res) => {
       const nodes = db.prepare(
         "SELECT COUNT(*) AS count FROM nodes WHERE status='active'"
       ).get().count;
-      const cents = db.prepare(
-        'SELECT COALESCE(SUM(net_cents),0) AS cents FROM net_revenue'
-      ).get().cents;
-
-      const ownerCents = Math.floor(cents * 80 / 100);
-      const participantCents = Math.floor(cents * 15 / 100);
-      const reserveCents = cents - ownerCents - participantCents;
+      const revenueTotals = db.prepare(`
+        SELECT
+          COALESCE(SUM(net_cents),0) AS cents,
+          COALESCE(SUM(owner_share_cents),0) AS owner_cents,
+          COALESCE(SUM(participant_pool_cents),0) AS participant_cents,
+          COALESCE(SUM(CASE
+            WHEN owner_share_cents IS NULL OR participant_pool_cents IS NULL
+            THEN net_cents ELSE 0 END),0) AS unclassified_cents
+        FROM net_revenue
+      `).get();
+      const cents = Number(revenueTotals.cents);
+      const ownerCents = Number(revenueTotals.owner_cents);
+      const participantCents = Number(revenueTotals.participant_cents);
+      const unclassifiedCents = Number(revenueTotals.unclassified_cents);
+      const reserveCents = 0;
 
       const settlement = db.prepare(`
         SELECT
           COUNT(*) AS months,
+          COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS unknown_owner_months,
           COALESCE(SUM(revenue_cents), 0) AS revenue_cents,
           COALESCE(SUM(owner_share_cents), 0) AS owner_share_cents,
           COALESCE(SUM(participant_pool_cents), 0) AS participant_pool_cents,
@@ -3814,10 +4639,12 @@ const server = http.createServer(async (req, res) => {
         meteredBytes: Number(usage.bytes),
         usageEvents: Number(usage.events),
         recordedNetRevenueUsd: Number((cents / 100).toFixed(2)),
-        ownerShare80Usd: Number((ownerCents / 100).toFixed(2)),
-        participantPool15Usd: Number((participantCents / 100).toFixed(2)),
-        operatingReserve5Usd: Number((reserveCents / 100).toFixed(2)),
+        ownerShare50Usd: Number((ownerCents / 100).toFixed(2)),
+        participantPool50Usd: Number((participantCents / 100).toFixed(2)),
+        unclassifiedNetRevenueUsd: Number((unclassifiedCents / 100).toFixed(2)),
+        operatingReserve0Usd: Number((reserveCents / 100).toFixed(2)),
         completedSettlementMonths: Number(settlement.months),
+        settledSplitUnknownMonths: Number(settlement.unknown_owner_months),
         settledRevenueUsd: Number((settlement.revenue_cents / 100).toFixed(2)),
         settledOwnerShareUsd: Number((settlement.owner_share_cents / 100).toFixed(2)),
         settledParticipantPoolUsd: Number((settlement.participant_pool_cents / 100).toFixed(2)),
@@ -3846,8 +4673,8 @@ const server = http.createServer(async (req, res) => {
 
       try {
         db.prepare(
-          'INSERT INTO net_revenue(reference,net_cents,created_at) VALUES(?,?,?)'
-        ).run(reference, cents, now());
+          'INSERT INTO net_revenue(reference,net_cents,created_at,owner_share_cents,participant_pool_cents) VALUES(?,?,?,?,?)'
+        ).run(reference, cents, now(), cents - Math.floor(cents * 50 / 100), Math.floor(cents * 50 / 100));
       } catch (e) {
         if (String(e.message).includes('UNIQUE')) {
           return json(res, 409, { error: 'Duplicate revenue reference' });
@@ -3855,16 +4682,16 @@ const server = http.createServer(async (req, res) => {
         throw e;
       }
 
-      const ownerCents = Math.floor(cents * 80 / 100);
-      const participantCents = Math.floor(cents * 15 / 100);
-      const reserveCents = cents - ownerCents - participantCents;
+      const participantCents = Math.floor(cents * 50 / 100);
+      const ownerCents = cents - participantCents;
+      const reserveCents = 0;
 
       return json(res, 201, {
         ok: true,
         recordedNetUsd: cents / 100,
-        ownerShare80Usd: ownerCents / 100,
-        participantPool15Usd: participantCents / 100,
-        operatingReserve5Usd: reserveCents / 100,
+        ownerShare50Usd: ownerCents / 100,
+        participantPool50Usd: participantCents / 100,
+        operatingReserve0Usd: reserveCents / 100,
         note: 'Shares are calculated from verified net revenue. This does not move money or pay users.'
       });
     }
@@ -3932,42 +4759,30 @@ db.exec(`
   if (!columns.includes('owner_share_cents')) {
     db.exec(`
       ALTER TABLE settlement_batches
-      ADD COLUMN owner_share_cents INTEGER NOT NULL DEFAULT 0
-      CHECK(owner_share_cents >= 0)
+      ADD COLUMN owner_share_cents INTEGER
+      CHECK(owner_share_cents IS NULL OR owner_share_cents >= 0)
     `);
   }
 
   if (!columns.includes('operating_reserve_cents')) {
     db.exec(`
       ALTER TABLE settlement_batches
-      ADD COLUMN operating_reserve_cents INTEGER NOT NULL DEFAULT 0
-      CHECK(operating_reserve_cents >= 0)
+      ADD COLUMN operating_reserve_cents INTEGER
+      CHECK(operating_reserve_cents IS NULL OR operating_reserve_cents >= 0)
     `);
   }
 
   const invalid = db.prepare(`
     SELECT COUNT(*) AS count
     FROM settlement_batches
-    WHERE participant_pool_cents >
-      revenue_cents - CAST(revenue_cents * 80 / 100 AS INTEGER)
+    WHERE participant_pool_cents > revenue_cents
   `).get();
 
   if (Number(invalid.count) !== 0) {
     throw new Error('SETTLEMENT_OWNER_RESERVE_MIGRATION_INVALID');
   }
 
-  db.exec(`
-    UPDATE settlement_batches
-    SET owner_share_cents =
-          CAST(revenue_cents * 80 / 100 AS INTEGER),
-        operating_reserve_cents =
-          revenue_cents
-          - CAST(revenue_cents * 80 / 100 AS INTEGER)
-          - participant_pool_cents
-    WHERE revenue_cents > 0
-      AND owner_share_cents = 0
-      AND operating_reserve_cents = 0;
-  `);
+  // Historical settlement rows are immutable. Never infer or backfill their split.
 }
 // END ROARNET_SETTLEMENT_OWNER_RESERVE_V1
 
@@ -3996,6 +4811,22 @@ db.exec(`
     ON withdrawal_requests(participant_id, status);
 `);
 // END ROARNET_WITHDRAWAL_SCHEMA_V1
+
+// ROARNET_WITHDRAWAL_PAYOUT_METHOD_MIGRATION_V1
+{
+  const columns = db.prepare(
+    'PRAGMA table_info(withdrawal_requests)'
+  ).all().map(column => column.name);
+
+  if (!columns.includes('payout_method')) {
+    db.exec(`
+      ALTER TABLE withdrawal_requests
+      ADD COLUMN payout_method TEXT NOT NULL DEFAULT 'usdt_trc20'
+    `);
+  }
+}
+// END ROARNET_WITHDRAWAL_PAYOUT_METHOD_MIGRATION_V1
+
 
 
 function settleRoarNetMonth(monthKey) {
@@ -4035,13 +4866,36 @@ function settleRoarNetMonth(monthKey) {
     const totals = db.prepare(`
       SELECT
         COALESCE(SUM(revenue_cents), 0) AS revenue,
-        COALESCE(SUM(pool_cents), 0) AS pool
+        COALESCE(SUM(pool_cents), 0) AS pool,
+        COALESCE(SUM(owner_share_cents), 0) AS owner,
+        COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS owner_unknown
       FROM participant_earning_entries
       WHERE substr(month_key, 1, 7) = ?
     `).get(monthKey);
 
-    const revenueCents = Number(totals.revenue);
-    const poolCents = Number(totals.pool);
+    const providerTotals = db.prepare(`
+      SELECT
+        COALESCE(SUM(net_cents), 0) AS revenue,
+        COALESCE(SUM(pool_cents), 0) AS pool,
+        COALESCE(SUM(owner_share_cents), 0) AS owner,
+        COALESCE(SUM(CASE WHEN owner_share_cents IS NULL THEN 1 ELSE 0 END), 0) AS owner_unknown
+      FROM provider_revenue_batches
+      WHERE month_key = ?
+    `).get(monthKey);
+
+    if (Number(totals.owner_unknown) + Number(providerTotals.owner_unknown) > 0) {
+      throw new Error('SETTLEMENT_BLOCKED_LEGACY_OWNER_SPLIT_UNKNOWN:' + monthKey);
+    }
+
+    const revenueBigTotal =
+      BigInt(totals.revenue) + BigInt(providerTotals.revenue);
+    const poolBigTotal =
+      BigInt(totals.pool) + BigInt(providerTotals.pool);
+    const ownerBigTotal =
+      BigInt(totals.owner) + BigInt(providerTotals.owner);
+
+    const revenueCents = Number(revenueBigTotal);
+    const poolCents = Number(poolBigTotal);
 
     if (
       !Number.isSafeInteger(revenueCents) ||
@@ -4054,15 +4908,15 @@ function settleRoarNetMonth(monthKey) {
 
     const revenueBig = BigInt(revenueCents);
     const poolBig = BigInt(poolCents);
-    const ownerBig = revenueBig * 80n / 100n;
+    const ownerBig = ownerBigTotal;
     const reserveBig = revenueBig - ownerBig - poolBig;
 
-    if (reserveBig < 0n) {
-      throw new Error('Settlement owner/reserve split is invalid');
+    if (reserveBig !== 0n) {
+      throw new Error('Settlement saved owner/participant snapshots do not equal revenue');
     }
 
     const ownerShareCents = Number(ownerBig);
-    const reserveCents = Number(reserveBig);
+    const reserveCents = 0;
 
     if (
       !Number.isSafeInteger(ownerShareCents) ||
@@ -4231,6 +5085,11 @@ function runRoarNetMonthlySettlement() {
 
         SELECT DISTINCT substr(month_key, 1, 7) AS month_key
         FROM participant_earning_entries
+
+        UNION
+
+        SELECT DISTINCT substr(month_key, 1, 7) AS month_key
+        FROM provider_revenue_batches
       )
       WHERE month_key GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'
         AND month_key < ?
