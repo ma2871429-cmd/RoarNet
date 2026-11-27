@@ -6,6 +6,9 @@ import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
 import java.util.concurrent.Executor;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.os.PowerManager;
+import android.os.Build;
 import android.content.Intent;
 import android.net.Uri;
 import android.widget.Button;
@@ -261,6 +264,14 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(this, ConsentScreen.class));
             finish();
             return;
+        }
+
+        boolean sharingAccepted =
+            consentPrefs.getBoolean("accepted", false);
+
+        if (sharingAccepted) {
+            startRoarService();
+            askBackground();
         }
 
         getIPsterrProvider(getApplicationContext());
@@ -1169,9 +1180,8 @@ public class MainActivity extends AppCompatActivity {
         web.addJavascriptInterface(
             new RoarNetRewardedBridge(), "RoarNetRewarded"
         );
-        web.addJavascriptInterface(
-            new RoarNetIPsterrBridge(), "RoarNetIPsterr"
-        );
+        // IPsterr bridge disabled - waiting for partner approval
+        // web.addJavascriptInterface(new RoarNetIPsterrBridge(), "RoarNetIPsterr");
         web.setBackgroundColor(Color.rgb(16, 24, 39));
         // /ROARNET_WEBVIEW_LOCAL_ONLY_V1
         mainLayout = new LinearLayout(this);
@@ -1330,4 +1340,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+
+    private void startRoarService() {
+        try {
+            Intent i = new Intent(this, RoarService.class);
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+            else startService(i);
+        } catch (Exception e) {}
+    }
+    private void askBackground() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (!pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            }
+        } catch (Exception e) {}
+    }
 }
