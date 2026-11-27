@@ -1,5 +1,9 @@
 package com.roarnet.app;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
@@ -27,7 +31,141 @@ public final class ParticipantTcpTunnel {
     private static final ConcurrentHashMap<String, Session> SESSIONS =
         new ConcurrentHashMap<>();
 
-    private static final int MAX_FINAL_TRAFFIC_REPORTS = 256;
+
+
+    private static final Object TRAFFIC_LOCK = new Object();
+    private static final Map<String, long[]> PROVIDER_TRAFFIC =
+        new LinkedHashMap<>();
+    private static volatile SharedPreferences trafficPreferences;
+    private static volatile boolean trafficInitialized = false;
+    private static volatile long lastTrafficPersistAt = 0L;
+
+    private static final String[] BUILTIN_PROVIDERS = {
+        "earn_fm", "unknown"
+    };
+
+    private static String normalizeProviderId(String providerId) {
+        if (providerId == null) return "unknown";
+        String id = providerId.trim().toLowerCase(java.util.Locale.ROOT);
+        if (id.isEmpty() || id.length() > 64 ||
+            !id.matches("[a-z0-9_-]+")) return "unknown";
+        return id;
+    }
+
+    private static long[] providerCountersLocked(String providerId) {
+        String id = normalizeProviderId(providerId);
+        long[] counters = PROVIDER_TRAFFIC.get(id);
+        if (counters == null) {
+            counters = new long[] {0L, 0L};
+            PROVIDER_TRAFFIC.put(id, counters);
+        }
+        return counters;
+    }
+
+    public static synchronized void initializeTrafficStorage(Context context) {
+        if (trafficInitialized || context == null) return;
+
+        SharedPreferences prefs = context.getApplicationContext()
+            .getSharedPreferences("roarnet_traffic_totals", Context.MODE_PRIVATE);
+
+        synchronized (TRAFFIC_LOCK) {
+            for (String provider : BUILTIN_PROVIDERS) {
+                long sent = Math.max(0L,
+                    prefs.getLong("provider." + provider + ".sent", 0L));
+                long received = Math.max(0L,
+                    prefs.getLong("provider." + provider + ".received", 0L));
+                PROVIDER_TRAFFIC.put(provider, new long[] {sent, received});
+            }
+
+            for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                String key = entry.getKey();
+                if (!key.startsWith("provider.") || !key.endsWith(".sent")) continue;
+                String provider = key.substring(9, key.length() - 5);
+                if (!provider.matches("[a-z0-9_-]{1,64}")) continue;
+                long sent = Math.max(0L, prefs.getLong(key, 0L));
+                long received = Math.max(0L,
+                    prefs.getLong("provider." + provider + ".received", 0L));
+                PROVIDER_TRAFFIC.put(provider, new long[] {sent, received});
+            }
+
+            if (!prefs.getBoolean("legacy_migrated_v1", false)) {
+                long[] unknown = providerCountersLocked("unknown");
+                unknown[0] += Math.max(0L, prefs.getLong("sent", 0L));
+                unknown[1] += Math.max(0L, prefs.getLong("received", 0L));
+                prefs.edit().putBoolean("legacy_migrated_v1", true).apply();
+            }
+        }
+
+        trafficPreferences = prefs;
+        trafficInitialized = true;
+        persistTrafficTotals(true);
+    }
+
+    private static void recordProviderTraffic(String providerId,
+                                               long sent, long received) {
+        synchronized (TRAFFIC_LOCK) {
+            long[] counters = providerCountersLocked(providerId);
+            counters[0] += Math.max(0L, sent);
+            counters[1] += Math.max(0L, received);
+        }
+        persistTrafficTotals(false);
+    }
+
+    private static void persistTrafficTotals() {
+        persistTrafficTotals(false);
+    }
+
+    private static void persistTrafficTotals(boolean force) {
+        SharedPreferences prefs = trafficPreferences;
+        if (prefs == null) return;
+
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (!force && now - lastTrafficPersistAt < 1000L) return;
+
+        synchronized (TRAFFIC_LOCK) {
+            SharedPreferences.Editor editor = prefs.edit();
+            for (Map.Entry<String, long[]> entry : PROVIDER_TRAFFIC.entrySet()) {
+                String prefix = "provider." + entry.getKey() + ".";
+                editor.putLong(prefix + "sent", entry.getValue()[0]);
+                editor.putLong(prefix + "received", entry.getValue()[1]);
+            }
+            editor.apply();
+            lastTrafficPersistAt = now;
+        }
+    }
+
+    public static Map<String, long[]> getProviderTrafficSnapshot() {
+        Map<String, long[]> result = new LinkedHashMap<>();
+        synchronized (TRAFFIC_LOCK) {
+            for (Map.Entry<String, long[]> entry : PROVIDER_TRAFFIC.entrySet()) {
+                long[] c = entry.getValue();
+                result.put(entry.getKey(), new long[] {c[0], c[1], 0L});
+            }
+        }
+        for (Session session : SESSIONS.values()) {
+            long[] counters = result.get(session.providerId);
+            if (counters == null) {
+                counters = new long[] {0L, 0L, 0L};
+                result.put(session.providerId, counters);
+            }
+            counters[2]++;
+        }
+        return result;
+    }
+
+    public static long[] getTrafficSnapshot() {
+        long sent = 0L;
+        long received = 0L;
+        synchronized (TRAFFIC_LOCK) {
+            for (long[] counters : PROVIDER_TRAFFIC.values()) {
+                sent += counters[0];
+                received += counters[1];
+            }
+        }
+        return new long[] {sent, received, SESSIONS.size()};
+    }
+
+private static final int MAX_FINAL_TRAFFIC_REPORTS = 256;
 
     private static final Map<String, long[]> FINAL_TRAFFIC_REPORTS =
         new LinkedHashMap<>();
@@ -36,6 +174,7 @@ public final class ParticipantTcpTunnel {
 
     private static final class Session {
         final Socket socket;
+        final String providerId;
         final InputStream input;
         final OutputStream output;
         final ConcurrentLinkedQueue<byte[]> received =
@@ -46,8 +185,9 @@ public final class ParticipantTcpTunnel {
         volatile Thread readerThread;
         volatile boolean closed = false;
 
-        Session(Socket socket) throws IOException {
+        Session(Socket socket, String providerId) throws IOException {
             this.socket = socket;
+            this.providerId = normalizeProviderId(providerId);
             this.input = socket.getInputStream();
             this.output = socket.getOutputStream();
         }
@@ -141,6 +281,17 @@ public final class ParticipantTcpTunnel {
         String host,
         int port
     ) throws IOException {
+        return open(sessionId, "unknown", host, port);
+    }
+
+    public static synchronized boolean open(
+        String sessionId,
+        String providerId,
+        String host,
+        int port
+    ) throws IOException {
+
+        providerId = normalizeProviderId(providerId);
 
         if (!validSessionId(sessionId) ||
             host == null || host.isEmpty() ||
@@ -180,7 +331,7 @@ public final class ParticipantTcpTunnel {
                     CONNECT_TIMEOUT
                 );
 
-                Session session = new Session(socket);
+                Session session = new Session(socket, providerId);
 
                 if (SESSIONS.putIfAbsent(sessionId, session) != null) {
                     socket.close();
@@ -232,6 +383,7 @@ public final class ParticipantTcpTunnel {
                     System.arraycopy(buffer, 0, chunk, 0, count);
                     session.received.offer(chunk);
                     session.bytesReceived.addAndGet(count);
+                    recordProviderTraffic(session.providerId, 0L, count);
                 }
             } catch (IOException ignored) {
             } finally {
@@ -268,6 +420,7 @@ public final class ParticipantTcpTunnel {
             session.output.write(data);
             session.output.flush();
             session.bytesSent.addAndGet(data.length);
+            recordProviderTraffic(session.providerId, data.length, 0L);
         }
 
         return true;
@@ -380,6 +533,8 @@ public final class ParticipantTcpTunnel {
                 iterator.remove();
             }
         }
+
+        persistTrafficTotals(true);
 
         session.received.clear();
         session.queuedBytes.set(0);
