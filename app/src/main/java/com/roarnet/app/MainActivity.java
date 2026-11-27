@@ -1,6 +1,10 @@
 package com.roarnet.app;
 
-import android.app.Activity;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import java.util.concurrent.Executor;
 import android.os.Bundle;
 import android.content.Intent;
 import android.net.Uri;
@@ -44,7 +48,7 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 import com.google.android.gms.ads.AdSize;
 import android.view.ViewGroup;
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
     private static final String LOCAL_URL = "http://127.0.0.1:3180/";
     private WebView web;
     private AdView bannerAdView;
@@ -727,10 +731,40 @@ public class MainActivity extends Activity {
     }
     // /ROARNET_DIAGNOSTIC_SPIDER_V1
 
+
+    // ROARNET_ADMIN_BIOMETRIC_V1
+    private boolean requireAdminBiometric() {
+        BiometricManager bm = BiometricManager.from(this);
+        if (bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
+            return false;
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean ok = new AtomicBoolean(false);
+        Executor executor = ContextCompat.getMainExecutor(this);
+        BiometricPrompt prompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
+            @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult r) { ok.set(true); latch.countDown(); }
+            @Override public void onAuthenticationError(int c, CharSequence e) { latch.countDown(); }
+            @Override public void onAuthenticationFailed() { }
+        });
+        runOnUiThread(() -> {
+            try {
+                prompt.authenticate(new BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("تأكيد هوية المدير")
+                    .setSubtitle("البصمة مطلوبة للوصول لبيانات الادمن")
+                    .setNegativeButtonText("إلغاء")
+                    .build());
+            } catch (Exception e) { latch.countDown(); }
+        });
+        try { latch.await(60, TimeUnit.SECONDS); } catch (Exception e) { return false; }
+        return ok.get();
+    }
+    // /ROARNET_ADMIN_BIOMETRIC_V1
+
     // ROARNET_ANDROID_ADMIN_BRIDGE_V1
     private final class RoarNetAdminBridge {
         @JavascriptInterface
         public String generateParticipantLinkCode(String nodeId) {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             if (nodeId == null ||
                 !nodeId.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
                 return "{\"error\":\"معرّف العقدة غير صالح.\"}";
@@ -872,11 +906,13 @@ public class MainActivity extends Activity {
         // ROARNET_ADMIN_WITHDRAWAL_BRIDGE_V1
         @JavascriptInterface
         public String getAdminWithdrawals() {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             return adminRequest("api/admin/withdrawals", "GET", "");
         }
 
         @JavascriptInterface
         public String updateAdminWithdrawal(String id, String json) {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             if (id == null || !id.matches("[0-9]{1,12}") ||
                 json == null || json.length() > 4096) {
                 return "{\"error\":\"بيانات طلب السحب غير صالحة.\"}";
@@ -897,16 +933,19 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getAdminSummary() {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             return adminRequest("api/admin/summary", "GET", "");
         }
 
         @JavascriptInterface
         public String getProviderRevenueBatches() {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             return adminRequest("api/admin/provider-revenue-batches", "GET", "");
         }
 
         @JavascriptInterface
         public String createProviderRevenueBatch(String json) {
+            if (!requireAdminBiometric()) return "{\"error\":\"مطلوب تأكيد البصمة.\"}";
             if (json == null || json.length() > 4096) {
                 return "{\"error\":\"بيانات التقرير غير صالحة.\"}";
             }
